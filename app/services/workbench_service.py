@@ -43,7 +43,7 @@ def to_catalog_item(row: Ingredient) -> IngredientCatalogItem:
         default_phase=row.default_phase,
         role=row.default_role,
         hlb=row.hlb,
-        default_weight_pct=row.default_weight_pct,
+        default_weight_pct=row.default_weight_pct or 0.0,
         min_recommended_pct=row.min_recommended_pct,
         max_recommended_pct=row.max_recommended_pct,
         bpom_limit_pct=row.bpom_limit_pct,

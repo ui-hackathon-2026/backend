@@ -81,15 +81,19 @@ def test_chassis_sum_100(client):
     for chassis in body:
         total = sum(i["weightPct"] for i in chassis["ingredients"])
         assert abs(total - 100.0) < 0.01, chassis["id"]
+        assert chassis["baseViscosity"] > 0
+        assert chassis["cogsIdrPerKg"] >= 0
+        assert chassis["tkdnPct"] >= 0
 
 
 def test_hero_ingredients(client, db_session):
     seed(db_session)
     body = client.get("/api/v1/orchestrator/hero-ingredients").json()
     assert len(body) == 3
-    assert body[0]["tkdn_pct"] >= body[1]["tkdn_pct"]
+    assert all(h["isLocalTkdn"] for h in body)
     vco = [h for h in body if h["inci"] == "Virgin Coconut Oil"][0]
-    assert vco["provenance"] == "Riau"
+    assert vco["localOrigin"] == "Riau"
+    assert len(vco["benefit"]) > 0
 
 
 def test_parse_brief_pdf(client, monkeypatch):

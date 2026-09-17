@@ -87,8 +87,8 @@ def recipe_features(
 ) -> dict:
     ingredients = []
     for inci, pct in recipe.items():
-        meta = next((p for p in POOL if p[0] == inci), None)
-        phase, role, hlb = meta[1], meta[2], meta[3] if meta else ("B", "active", None)
+        meta = next((p for p in POOL if p[0] == inci), ("", "B", "active", None))
+        phase, role, hlb = meta[1], meta[2], meta[3]
         ingredients.append(
             IngredientInput(
                 name=inci, inci=inci, smiles="O", weight_pct=pct,

@@ -1,25 +1,25 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class IngredientCatalogItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     id: str
     name: str
     inci: str
     smiles: str
     cas_number: str | None = None
-    default_phase: str
+    default_phase: str = Field(alias="phase")
     role: str
     hlb: float | None = None
-    default_weight_pct: float | None = None
+    default_weight_pct: float = Field(default=0.0, alias="weightPct")
     min_recommended_pct: float | None = None
     max_recommended_pct: float | None = None
-    bpom_limit_pct: float | None = None
-    is_halal: bool
-    tkdn_pct: float
-    cost_per_kg_idr: float
+    bpom_limit_pct: float | None = Field(default=None, alias="bpomLimitPct")
+    is_halal: bool = Field(alias="isHalal")
+    tkdn_pct: float = Field(alias="tkdnPct")
+    cost_per_kg_idr: float = Field(alias="costPerKgIdr")
     description: str | None = None
-
-    model_config = {"from_attributes": True}
 
 
 class IngredientListResponse(BaseModel):

@@ -67,13 +67,16 @@ class ChassisModel(BaseModel):
     name: str
     category: str
     description: str
-    ingredients: list[ChassisIngredient]
+    baseViscosity: float = 0.0
+    cogsIdrPerKg: float = 0.0
+    tkdnPct: float = 0.0
+    ingredients: list[ChassisIngredient] = Field(default_factory=list)
 
 
 class HeroIngredient(BaseModel):
     id: str
     name: str
     inci: str
-    tkdn_pct: float
-    provenance: str | None = None
-    description: str | None = None
+    localOrigin: str | None = None
+    benefit: str
+    isLocalTkdn: bool

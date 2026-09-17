@@ -333,6 +333,8 @@ def list_chassis(db: Session) -> list[ChassisModel]:
     models: list[ChassisModel] = []
     for chassis in CHASSIS:
         items = []
+        cogs = 0.0
+        tkdn = 0.0
         for position, (name, inci, phase, pct) in enumerate(chassis["ingredients"]):
             known = catalog.get(inci)
             role = None
@@ -340,6 +342,8 @@ def list_chassis(db: Session) -> list[ChassisModel]:
                 if pool_inci == inci:
                     role = pool_role
                     break
+            cogs += pct / 100.0 * (known.cost_per_kg_idr or 0.0) if known else 0.0
+            tkdn += pct / 100.0 * (known.tkdn_pct or 0.0) if known else 0.0
             items.append(
                 ChassisIngredient(
                     name=name,
@@ -349,6 +353,7 @@ def list_chassis(db: Session) -> list[ChassisModel]:
                     functionDesc=FUNCTION_DESC.get(role or "active", role or "active"),
                 )
             )
+        recipe = {inci: pct for _, inci, _, pct in chassis["ingredients"]}
         models.append(
             ChassisModel(
                 id=chassis["id"],
@@ -356,6 +361,9 @@ def list_chassis(db: Session) -> list[ChassisModel]:
                 name=chassis["name"],
                 category=chassis["category"],
                 description=chassis["description"],
+                baseViscosity=estimate_viscosity(db, recipe),
+                cogsIdrPerKg=round(cogs, 0),
+                tkdnPct=round(tkdn, 1),
                 ingredients=items,
             )
         )
@@ -377,9 +385,10 @@ def list_heroes(db: Session) -> list[HeroIngredient]:
             id=f"cat-{slug(row.inci)}",
             name=row.name,
             inci=row.inci,
-            tkdn_pct=row.tkdn_pct or 0.0,
-            provenance=row.origin,
-            description=row.description,
+            localOrigin=row.origin,
+            benefit=row.description
+            or f"Komponen lokal TKDN {row.tkdn_pct or 0.0:g}%.",
+            isLocalTkdn=True,
         )
         for row in rows
     ]

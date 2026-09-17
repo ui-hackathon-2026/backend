@@ -44,7 +44,10 @@ def test_ingredients_filters(client, db_session):
     all_items = client.get("/api/v1/workbench/ingredients").json()
     assert all_items["total"] == 3
     assert all_items["items"][0]["id"].startswith("cat-")
-    assert "is_halal" in all_items["items"][0]
+    first = all_items["items"][0]
+    assert first["isHalal"] is True
+    assert first["phase"] in ("A", "B", "C", "D")
+    assert "weightPct" in first and "costPerKgIdr" in first
     phase_d = client.get("/api/v1/workbench/ingredients?phase=D").json()
     assert phase_d["total"] == 1
     assert phase_d["items"][0]["inci"] == "Niacinamide"
