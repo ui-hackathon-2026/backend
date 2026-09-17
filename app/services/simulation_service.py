@@ -38,6 +38,9 @@ class Predictor(Protocol):
     def predict(self, features: dict) -> dict:
         ...
 
+    def predict_many(self, batch: list[dict]) -> list[dict]:
+        return [self.predict(features) for features in batch]
+
 
 class StubPredictor:
     def predict(self, features: dict) -> dict:
@@ -85,14 +88,15 @@ def role_sum(request: SimulationRequest, role: str) -> float:
     )
 
 
-def extract_features(db: Session, request: SimulationRequest) -> dict:
+def extract_features(db: Session, request: SimulationRequest, known_incis: set[str] | None = None) -> dict:
     total = sum(i.weight_pct for i in request.ingredients)
     if not (WEIGHT_SUM_MIN <= total <= WEIGHT_SUM_MAX):
         raise FormulaWeightError(f"weights sum to {total}, expected 100")
-    try:
-        known_incis = {row.inci for row in db.query(Ingredient.inci).all()}
-    except Exception as exc:
-        raise DatabaseUnavailableError(str(exc)) from exc
+    if known_incis is None:
+        try:
+            known_incis = {row.inci for row in db.query(Ingredient.inci).all()}
+        except Exception as exc:
+            raise DatabaseUnavailableError(str(exc)) from exc
     oil_pct = sum(i.weight_pct for i in request.ingredients if i.phase.value == "A")
     emulsifier_pct = role_sum(request, "emulsifier")
     thickener_pct = role_sum(request, "thickener")

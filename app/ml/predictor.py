@@ -91,29 +91,37 @@ class LightGBMPredictor:
         )
 
     def predict(self, features: dict) -> dict:
+        return self.predict_many([features])[0]
+
+    def predict_many(self, batch: list[dict]) -> list[dict]:
         import warnings
 
-        row = self.feature_row(features)
+        frame = pd.concat(
+            [self.feature_row(features) for features in batch], ignore_index=True
+        )
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore",
                 message=f".*{TRAINING_EMPTY_FEATURES_WARNING}.*",
             )
             proba = {
-                name: clamp(self._models[name].predict_proba(row)[0][1], 0.0, 1.0)
+                name: self._models[name].predict_proba(frame)[:, 1]
                 for name in ("stability_pass", "phase_separation", "feasible")
             }
-            viscosity = float(self._models["viscosity"].predict(row)[0])
-            droplet = float(self._models["droplet"].predict(row)[0])
-            pdi = float(self._models["pdi"].predict(row)[0])
-        return {
-            "stability_score": round(proba["stability_pass"], 3),
-            "phase_separation_prob": round(proba["phase_separation"], 3),
-            "confidence_score": round(proba["feasible"], 3),
-            "dynamic_viscosity_mpas": round(max(0.0, viscosity), 1),
-            "mean_droplet_size_nm": round(max(0.0, droplet), 1),
-            "polydispersity_index": round(clamp(pdi, 0.0, 1.0), 3),
-        }
+            viscosity = self._models["viscosity"].predict(frame)
+            droplet = self._models["droplet"].predict(frame)
+            pdi = self._models["pdi"].predict(frame)
+        return [
+            {
+                "stability_score": round(clamp(proba["stability_pass"][i], 0.0, 1.0), 3),
+                "phase_separation_prob": round(clamp(proba["phase_separation"][i], 0.0, 1.0), 3),
+                "confidence_score": round(clamp(proba["feasible"][i], 0.0, 1.0), 3),
+                "dynamic_viscosity_mpas": round(max(0.0, float(viscosity[i])), 1),
+                "mean_droplet_size_nm": round(max(0.0, float(droplet[i])), 1),
+                "polydispersity_index": round(clamp(float(pdi[i]), 0.0, 1.0), 3),
+            }
+            for i in range(len(batch))
+        ]
 
 
 @lru_cache(maxsize=1)

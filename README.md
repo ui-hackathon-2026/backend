@@ -117,6 +117,17 @@ result carrying the parsed formulation spec. Sessions and messages
 persist for multi-turn context. LLM outage yields an error event,
 never a dropped connection.
 
+## Optimize, Batch, Similarity
+
+`POST /api/v1/optimize/pareto` runs greedy random search over the mass
+simplex honoring locked ingredients, scores every trial in one
+vectorized surrogate batch, and returns Top-3 plus 3D scatter points.
+`POST /api/v1/batch-sheet/generate` converts a formula to exact gram
+weights with SOP steps. `POST /api/v1/similarity/check` compares
+Jaccard, cosine, and phase-chassis overlap against stored formulas.
+`GET /api/v1/suppliers` reads the supplier catalog. Patent FTO and 3D
+conformers honestly answer 503 until their engines connect.
+
 ## Test
 
 ```bash

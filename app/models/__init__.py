@@ -5,6 +5,7 @@ through Base.metadata.
 """
 
 from app.core.database import Base
+from app.models.catalog import BatchRecord, OptimizationJob, Supplier
 from app.models.chat import ChatMessage, ChatSession
 from app.models.compliance import BpomLimit
 from app.models.formula import Formula, FormulaIngredient, FormulaVersion
@@ -15,6 +16,7 @@ from app.models.user import User, UserRole
 
 __all__ = [
     "Base",
+    "BatchRecord",
     "BpomLimit",
     "Brief",
     "ChatMessage",
@@ -23,8 +25,10 @@ __all__ = [
     "FormulaIngredient",
     "FormulaVersion",
     "Ingredient",
+    "OptimizationJob",
     "Project",
     "SimulationRun",
+    "Supplier",
     "User",
     "UserRole",
 ]
