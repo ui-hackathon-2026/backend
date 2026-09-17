@@ -32,6 +32,8 @@ def total_weight(items) -> float:
 
 def check_total(items) -> float:
     total = total_weight(items)
+    if len(items) == 0:
+        return 0.0
     if not (WEIGHT_SUM_MIN <= total <= WEIGHT_SUM_MAX):
         raise FormulaWeightError(f"weights sum to {total}, expected 100")
     return total
@@ -46,7 +48,7 @@ def to_response(formula: Formula, total: float) -> FormulaResponse:
         notes=formula.notes,
         project_id=formula.project_id,
         total_weight_pct=total,
-        status=VALID_BALANCED,
+        status="EMPTY_DRAFT" if len(formula.ingredients) == 0 else VALID_BALANCED,
         updated_at=formula.updated_at,
         ingredients=[
             {
