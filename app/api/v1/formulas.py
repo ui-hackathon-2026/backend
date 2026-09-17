@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException, Response, status
 
 from app.api.deps import OptionalUserDep, SessionDep
 from app.schemas.formula import (
+    FormulaAdjustmentRequest,
+    FormulaAdjustmentResponse,
     FormulaCreate,
     FormulaResponse,
     FormulaUpdate,
@@ -13,6 +15,7 @@ from app.services.formula_service import (
     get_formula,
     list_formulas,
     list_versions,
+    propose_formula_adjustment,
     update_formula,
 )
 
@@ -54,12 +57,34 @@ def update(
     body: FormulaUpdate,
     db: SessionDep,
     user: OptionalUserDep,
+    create_version: bool = True,
 ) -> FormulaResponse:
     owner_id = user.id if user else None
-    result = update_formula(db, formula_id, body, owner_id=owner_id)
+    result = update_formula(
+        db, formula_id, body, owner_id=owner_id, create_version=create_version
+    )
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Formula not found"
+        )
+    return result
+
+
+@router.post("/{formula_id}/propose-adjustment", response_model=FormulaAdjustmentResponse)
+def propose_adjustment(
+    formula_id: str,
+    body: FormulaAdjustmentRequest,
+    db: SessionDep,
+    user: OptionalUserDep,
+) -> FormulaAdjustmentResponse:
+    owner_id = user.id if user else None
+    result = propose_formula_adjustment(
+        db, formula_id, body.prompt, owner_id=owner_id
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Formula not found or contains no ingredients to adjust",
         )
     return result
 

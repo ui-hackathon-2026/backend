@@ -79,3 +79,26 @@ class FormulaVersionOutput(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class FormulaAdjustmentRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=2000)
+
+
+class FormulaChangeItem(BaseModel):
+    ingredient_id: str
+    name: str
+    inci: str
+    phase: str
+    old_pct: float
+    new_pct: float
+    action: str = "modified"  # modified, added, removed
+
+
+class FormulaAdjustmentResponse(BaseModel):
+    formula_id: str
+    title: str
+    explanation: str
+    changes: list[FormulaChangeItem]
+    updated_phases: FormulaPhases
+    total_weight_pct: float
