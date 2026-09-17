@@ -131,6 +131,15 @@ Jaccard, cosine, and phase-chassis overlap against stored formulas.
 `GET /api/v1/suppliers` reads the supplier catalog. Patent FTO and 3D
 conformers honestly answer 503 until their engines connect.
 
+## NSGA Optimizer
+
+`POST /api/v1/optimizer/run-nsga2` evaluates up to 50000 trials in one
+vectorized surrogate batch, computes the exact Pareto front with numpy
+sweep, ranks, Monte-Carlo hypervolume, and returns Top-3 with LLM
+narratives plus downsampled scatter points. Infeasible constraint sets
+yield 422 with best-achieved suggestions. Expect ~20s at 50000 trials
+(mostly LLM narratives); default 2000 trials responds in ~3s.
+
 ## Workbench
 
 `GET /api/v1/workbench/ingredients` reads the lab catalog with

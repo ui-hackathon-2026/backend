@@ -38,7 +38,9 @@ class Predictor(Protocol):
     def predict(self, features: dict) -> dict:
         ...
 
-    def predict_many(self, batch: list[dict]) -> list[dict]:
+    def predict_many(
+        self, batch: list[dict], only: tuple[str, ...] | None = None
+    ) -> list[dict]:
         return [self.predict(features) for features in batch]
 
 
