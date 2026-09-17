@@ -10,7 +10,7 @@ from app.models.user import User
 
 SessionDep = Annotated[Session, Depends(get_db)]
 
-bearer_scheme = HTTPBearer()
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def unauthorized() -> HTTPException:
@@ -22,8 +22,10 @@ def unauthorized() -> HTTPException:
 
 def get_current_user(
     db: SessionDep,
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
 ) -> User:
+    if credentials is None:
+        raise unauthorized()
     payload = decode_token(credentials.credentials, "access")
     if payload is None:
         raise unauthorized()
@@ -37,3 +39,21 @@ def get_current_user(
 
 
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
+
+
+def get_optional_user(
+    db: SessionDep,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+) -> User | None:
+    if credentials is None:
+        return None
+    payload = decode_token(credentials.credentials, "access")
+    if payload is None:
+        return None
+    try:
+        return db.get(User, int(payload["sub"]))
+    except (KeyError, ValueError):
+        return None
+
+
+OptionalUserDep = Annotated[User | None, Depends(get_optional_user)]

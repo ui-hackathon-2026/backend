@@ -62,7 +62,7 @@ def to_response(formula: Formula, total: float) -> FormulaResponse:
     )
 
 
-def create_formula(db: Session, body: FormulaCreate) -> FormulaResponse:
+def create_formula(db: Session, body: FormulaCreate, owner_id: int | None = None) -> FormulaResponse:
     items = body.phases.flattened()
     total = check_total(items)
     try:
@@ -73,6 +73,7 @@ def create_formula(db: Session, body: FormulaCreate) -> FormulaResponse:
             batch_size_g=body.batch_size_g,
             notes=body.notes,
             project_id=body.project_id,
+            owner_id=owner_id,
         )
         db.add(formula)
         for phase, item in items:
@@ -97,9 +98,14 @@ def create_formula(db: Session, body: FormulaCreate) -> FormulaResponse:
     return to_response(formula, total)
 
 
-def get_formula(db: Session, formula_id: str) -> FormulaResponse | None:
+def get_formula(db: Session, formula_id: str, owner_id: int | None = None) -> FormulaResponse | None:
     try:
-        formula = db.get(Formula, formula_id)
+        query = db.query(Formula).filter(Formula.id == formula_id)
+        if owner_id is not None:
+            query = query.filter(Formula.owner_id == owner_id)
+        else:
+            query = query.filter(Formula.owner_id.is_(None))
+        formula = query.first()
     except Exception as exc:
         raise DatabaseUnavailableError(str(exc)) from exc
     if formula is None:
@@ -109,11 +115,16 @@ def get_formula(db: Session, formula_id: str) -> FormulaResponse | None:
     )
 
 
-def list_formulas(db: Session, limit: int = 50) -> list[FormulaResponse]:
+def list_formulas(db: Session, limit: int = 50, owner_id: int | None = None) -> list[FormulaResponse]:
     try:
-        rows = (
-            db.query(Formula).order_by(Formula.updated_at.desc()).limit(limit).all()
-        )
+        query = db.query(Formula)
+        if owner_id is not None:
+            # Only return formulas belonging to current user
+            query = query.filter(Formula.owner_id == owner_id)
+        else:
+            # If no authenticated user, only return unowned/public chassis
+            query = query.filter(Formula.owner_id.is_(None))
+        rows = query.order_by(Formula.updated_at.desc()).limit(limit).all()
     except Exception as exc:
         raise DatabaseUnavailableError(str(exc)) from exc
     return [
@@ -123,12 +134,17 @@ def list_formulas(db: Session, limit: int = 50) -> list[FormulaResponse]:
 
 
 def update_formula(
-    db: Session, formula_id: str, body: FormulaUpdate
+    db: Session, formula_id: str, body: FormulaUpdate, owner_id: int | None = None
 ) -> FormulaResponse | None:
     items = body.phases.flattened()
     total = check_total(items)
     try:
-        formula = db.get(Formula, formula_id)
+        query = db.query(Formula).filter(Formula.id == formula_id)
+        if owner_id is not None:
+            query = query.filter(Formula.owner_id == owner_id)
+        else:
+            query = query.filter(Formula.owner_id.is_(None))
+        formula = query.first()
         if formula is None:
             return None
         latest = (
@@ -165,6 +181,8 @@ def update_formula(
         formula.batch_size_g = body.batch_size_g
         formula.notes = body.notes
         formula.project_id = body.project_id
+        if owner_id is not None and formula.owner_id is None:
+            formula.owner_id = owner_id
         for old in list(formula.ingredients):
             db.delete(old)
         for phase, item in items:
@@ -189,9 +207,14 @@ def update_formula(
     return to_response(formula, total)
 
 
-def delete_formula(db: Session, formula_id: str) -> bool:
+def delete_formula(db: Session, formula_id: str, owner_id: int | None = None) -> bool:
     try:
-        formula = db.get(Formula, formula_id)
+        query = db.query(Formula).filter(Formula.id == formula_id)
+        if owner_id is not None:
+            query = query.filter(Formula.owner_id == owner_id)
+        else:
+            query = query.filter(Formula.owner_id.is_(None))
+        formula = query.first()
         if formula is None:
             return False
         db.delete(formula)
@@ -202,9 +225,14 @@ def delete_formula(db: Session, formula_id: str) -> bool:
     return True
 
 
-def list_versions(db: Session, formula_id: str) -> list[FormulaVersionOutput] | None:
+def list_versions(db: Session, formula_id: str, owner_id: int | None = None) -> list[FormulaVersionOutput] | None:
     try:
-        formula = db.get(Formula, formula_id)
+        query = db.query(Formula).filter(Formula.id == formula_id)
+        if owner_id is not None:
+            query = query.filter(Formula.owner_id == owner_id)
+        else:
+            query = query.filter(Formula.owner_id.is_(None))
+        formula = query.first()
         if formula is None:
             return None
         rows = (

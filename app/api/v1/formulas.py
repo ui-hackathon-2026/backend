@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Response, status
 
-from app.api.deps import SessionDep
+from app.api.deps import OptionalUserDep, SessionDep
 from app.schemas.formula import (
     FormulaCreate,
     FormulaResponse,
@@ -20,18 +20,27 @@ router = APIRouter(prefix="/formulas", tags=["formulas"])
 
 
 @router.post("", response_model=FormulaResponse, status_code=201)
-def create(body: FormulaCreate, db: SessionDep) -> FormulaResponse:
-    return create_formula(db, body)
+def create(
+    body: FormulaCreate, db: SessionDep, user: OptionalUserDep
+) -> FormulaResponse:
+    owner_id = user.id if user else None
+    return create_formula(db, body, owner_id=owner_id)
 
 
 @router.get("", response_model=list[FormulaResponse])
-def list_all(db: SessionDep, limit: int = 50) -> list[FormulaResponse]:
-    return list_formulas(db, limit=min(limit, 200))
+def list_all(
+    db: SessionDep, user: OptionalUserDep, limit: int = 50
+) -> list[FormulaResponse]:
+    owner_id = user.id if user else None
+    return list_formulas(db, limit=min(limit, 200), owner_id=owner_id)
 
 
 @router.get("/{formula_id}", response_model=FormulaResponse)
-def get_one(formula_id: str, db: SessionDep) -> FormulaResponse:
-    result = get_formula(db, formula_id)
+def get_one(
+    formula_id: str, db: SessionDep, user: OptionalUserDep
+) -> FormulaResponse:
+    owner_id = user.id if user else None
+    result = get_formula(db, formula_id, owner_id=owner_id)
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Formula not found"
@@ -41,9 +50,13 @@ def get_one(formula_id: str, db: SessionDep) -> FormulaResponse:
 
 @router.put("/{formula_id}", response_model=FormulaResponse)
 def update(
-    formula_id: str, body: FormulaUpdate, db: SessionDep
+    formula_id: str,
+    body: FormulaUpdate,
+    db: SessionDep,
+    user: OptionalUserDep,
 ) -> FormulaResponse:
-    result = update_formula(db, formula_id, body)
+    owner_id = user.id if user else None
+    result = update_formula(db, formula_id, body, owner_id=owner_id)
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Formula not found"
@@ -52,8 +65,11 @@ def update(
 
 
 @router.delete("/{formula_id}", status_code=204)
-def delete(formula_id: str, db: SessionDep) -> Response:
-    if not delete_formula(db, formula_id):
+def delete(
+    formula_id: str, db: SessionDep, user: OptionalUserDep
+) -> Response:
+    owner_id = user.id if user else None
+    if not delete_formula(db, formula_id, owner_id=owner_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Formula not found"
         )
@@ -61,8 +77,11 @@ def delete(formula_id: str, db: SessionDep) -> Response:
 
 
 @router.get("/{formula_id}/versions", response_model=list[FormulaVersionOutput])
-def versions(formula_id: str, db: SessionDep) -> list[FormulaVersionOutput]:
-    result = list_versions(db, formula_id)
+def versions(
+    formula_id: str, db: SessionDep, user: OptionalUserDep
+) -> list[FormulaVersionOutput]:
+    owner_id = user.id if user else None
+    result = list_versions(db, formula_id, owner_id=owner_id)
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Formula not found"
