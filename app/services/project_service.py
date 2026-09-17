@@ -120,3 +120,97 @@ def ingest_brief(db: Session, filename: str, data: bytes) -> BriefResponse:
         preview=text[:500],
         created_at=brief.created_at,
     )
+
+
+def get_tree(db: Session, project_id: str):
+    from app.models.catalog import BatchRecord
+    from app.models.chat import ChatMessage, ChatSession
+    from app.models.formula import Formula, FormulaVersion
+    from app.schemas.project import (
+        ProjectTree,
+        TreeBatchRecord,
+        TreeBrief,
+        TreeFormula,
+        TreeSession,
+        TreeVersion,
+    )
+
+    try:
+        project = db.get(Project, project_id)
+        if project is None:
+            return None
+        brief = db.get(Brief, project.brief_id) if project.brief_id else None
+        formulas = (
+            db.query(Formula)
+            .filter(Formula.project_id == project_id)
+            .order_by(Formula.updated_at.desc())
+            .all()
+        )
+        sessions = (
+            db.query(ChatSession)
+            .filter(ChatSession.project_id == project_id)
+            .order_by(ChatSession.created_at.desc())
+            .all()
+        )
+        tree_formulas = []
+        for formula in formulas:
+            versions = (
+                db.query(FormulaVersion)
+                .filter(FormulaVersion.formula_id == formula.id)
+                .order_by(FormulaVersion.version.desc())
+                .all()
+            )
+            batches = (
+                db.query(BatchRecord)
+                .filter(BatchRecord.formula_id == formula.id)
+                .order_by(BatchRecord.created_at.desc())
+                .all()
+            )
+            tree_formulas.append(
+                TreeFormula(
+                    formula_id=formula.id,
+                    name=formula.name,
+                    updated_at=formula.updated_at,
+                    versions=[
+                        TreeVersion(version=v.version, created_at=v.created_at)
+                        for v in versions
+                    ],
+                    batch_records=[
+                        TreeBatchRecord(
+                            id=b.id,
+                            batch_size_g=b.batch_size_g,
+                            created_at=b.created_at,
+                        )
+                        for b in batches
+                    ],
+                )
+            )
+        tree_sessions = []
+        for session in sessions:
+            count = (
+                db.query(ChatMessage)
+                .filter(ChatMessage.session_id == session.id)
+                .count()
+            )
+            tree_sessions.append(
+                TreeSession(
+                    session_id=session.id,
+                    message_count=count,
+                    created_at=session.created_at,
+                )
+            )
+    except Exception as exc:
+        raise DatabaseUnavailableError(str(exc)) from exc
+    return ProjectTree(
+        project_id=project.id,
+        name=project.name,
+        brief=TreeBrief(
+            brief_id=brief.id,
+            filename=brief.filename,
+            created_at=brief.created_at,
+        )
+        if brief
+        else None,
+        formulas=tree_formulas,
+        chat_sessions=tree_sessions,
+    )

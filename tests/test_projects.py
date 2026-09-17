@@ -88,3 +88,38 @@ def test_upload_brief_rejects_non_pdf(client):
         files={"file": ("notes.txt", b"hello", "text/plain")},
     )
     assert r.status_code == 422
+
+
+def test_project_tree(client):
+    pid = client.post(
+        "/api/v1/projects", json={"name": "Tree Demo"}
+    ).json()["project_id"]
+    fid = client.post(
+        "/api/v1/formulas",
+        json={
+            "name": "Linked",
+            "project_id": pid,
+            "phases": {"phase_b": [{"inci": "Aqua", "weight_pct": 100.0}]},
+        },
+    ).json()["formula_id"]
+    client.put(
+        f"/api/v1/formulas/{fid}",
+        json={
+            "name": "Linked v2",
+            "project_id": pid,
+            "phases": {"phase_b": [{"inci": "Aqua", "weight_pct": 100.0}]},
+        },
+    )
+    client.post(
+        "/api/v1/batch-sheet/generate",
+        json={"formula_id": fid, "batch_size_grams": 500.0},
+    )
+    body = client.get(f"/api/v1/projects/{pid}/tree").json()
+    assert body["project_id"] == pid
+    assert body["brief"] is None
+    assert len(body["formulas"]) == 1
+    assert body["formulas"][0]["formula_id"] == fid
+    assert len(body["formulas"][0]["versions"]) == 1
+    assert len(body["formulas"][0]["batch_records"]) == 1
+    assert body["chat_sessions"] == []
+    assert client.get("/api/v1/projects/proj_nope/tree").status_code == 404

@@ -5,11 +5,13 @@ from app.schemas.project import (
     BriefResponse,
     ProjectCreate,
     ProjectResponse,
+    ProjectTree,
 )
 from app.services.project_service import (
     BriefRejectedError,
     create_project,
     get_project,
+    get_tree,
     ingest_brief,
     list_projects,
 )
@@ -30,6 +32,16 @@ def list_all(db: SessionDep, limit: int = 50) -> list[ProjectResponse]:
 @router.get("/{project_id}", response_model=ProjectResponse)
 def get_one(project_id: str, db: SessionDep) -> ProjectResponse:
     result = get_project(db, project_id)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
+        )
+    return result
+
+
+@router.get("/{project_id}/tree", response_model=ProjectTree)
+def tree(project_id: str, db: SessionDep) -> ProjectTree:
+    result = get_tree(db, project_id)
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"

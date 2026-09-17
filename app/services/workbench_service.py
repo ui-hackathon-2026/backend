@@ -158,6 +158,7 @@ def save_draft(db: Session, body: WorkbenchSaveRequest) -> WorkbenchSaveResponse
             category=body.category,
             batch_size_g=body.batch_size_g,
             notes=body.notes,
+            project_id=body.project_id,
             phases=FormulaPhases(
                 phase_a=groups["A"], phase_b=groups["B"],
                 phase_c=groups["C"], phase_d=groups["D"],

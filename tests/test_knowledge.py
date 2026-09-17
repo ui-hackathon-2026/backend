@@ -123,6 +123,11 @@ def test_conformer_niacinamide(client):
     assert "HETATM" in body["pdb_content"]
     assert body["molecular_weight"] == 122.13
     assert body["marker_compound"] is None
+    assert len(body["atoms"]) > 0
+    first_atom = body["atoms"][0]
+    assert set(first_atom) == {"id", "element", "x", "y", "z"}
+    assert len(body["bonds"]) > 0
+    assert set(body["bonds"][0]) == {"source", "target", "order"}
 
 
 def test_conformer_green_tea_marker(client):

@@ -42,3 +42,42 @@ class BriefResponse(BaseModel):
     char_count: int
     preview: str
     created_at: datetime
+
+
+class TreeBrief(BaseModel):
+    brief_id: str
+    filename: str
+    created_at: datetime
+
+
+class TreeVersion(BaseModel):
+    version: int
+    created_at: datetime
+
+
+class TreeBatchRecord(BaseModel):
+    id: str
+    batch_size_g: float
+    created_at: datetime
+
+
+class TreeFormula(BaseModel):
+    formula_id: str
+    name: str
+    updated_at: datetime
+    versions: list[TreeVersion] = Field(default_factory=list)
+    batch_records: list[TreeBatchRecord] = Field(default_factory=list)
+
+
+class TreeSession(BaseModel):
+    session_id: str
+    message_count: int
+    created_at: datetime
+
+
+class ProjectTree(BaseModel):
+    project_id: str
+    name: str
+    brief: TreeBrief | None = None
+    formulas: list[TreeFormula] = Field(default_factory=list)
+    chat_sessions: list[TreeSession] = Field(default_factory=list)

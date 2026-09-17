@@ -88,6 +88,7 @@ class WorkbenchSaveRequest(BaseModel):
     category: str | None = Field(default=None, max_length=128)
     batch_size_g: float = Field(default=1000.0, gt=0)
     notes: str | None = Field(default=None, max_length=1024)
+    project_id: str | None = Field(default=None, max_length=64)
     ingredients: list[WorkbenchSaveIngredient] = Field(min_length=1)
 
 

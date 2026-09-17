@@ -56,12 +56,41 @@ def minimized_energy(mol: Chem.Mol) -> float | None:
         return None
 
 
+BOND_ORDERS = {
+    Chem.BondType.SINGLE: 1,
+    Chem.BondType.DOUBLE: 2,
+    Chem.BondType.TRIPLE: 3,
+    Chem.BondType.AROMATIC: 1,
+}
+
+
 def describe(mol: Chem.Mol, display_name: str, marker_name: str | None) -> dict:
+    conf = mol.GetConformer()
+    atoms = [
+        {
+            "id": atom.GetIdx(),
+            "element": atom.GetSymbol(),
+            "x": round(conf.GetAtomPosition(atom.GetIdx()).x, 4),
+            "y": round(conf.GetAtomPosition(atom.GetIdx()).y, 4),
+            "z": round(conf.GetAtomPosition(atom.GetIdx()).z, 4),
+        }
+        for atom in mol.GetAtoms()
+    ]
+    bonds = [
+        {
+            "source": bond.GetBeginAtomIdx(),
+            "target": bond.GetEndAtomIdx(),
+            "order": BOND_ORDERS.get(bond.GetBondType(), 1),
+        }
+        for bond in mol.GetBonds()
+    ]
     return {
         "molecule_name": display_name,
         "marker_compound": marker_name,
         "format": "pdb",
         "pdb_content": Chem.MolToPDBBlock(mol),
+        "atoms": atoms,
+        "bonds": bonds,
         "molecular_weight": round(Descriptors.MolWt(mol), 2),
         "logP": round(Descriptors.MolLogP(mol), 2),
         "tpsa": round(Descriptors.TPSA(mol), 2),

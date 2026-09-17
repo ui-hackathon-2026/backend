@@ -44,6 +44,7 @@ def to_response(formula: Formula, total: float) -> FormulaResponse:
         category=formula.category,
         batch_size_g=formula.batch_size_g,
         notes=formula.notes,
+        project_id=formula.project_id,
         total_weight_pct=total,
         status=VALID_BALANCED,
         updated_at=formula.updated_at,
@@ -71,6 +72,7 @@ def create_formula(db: Session, body: FormulaCreate) -> FormulaResponse:
             category=body.category,
             batch_size_g=body.batch_size_g,
             notes=body.notes,
+            project_id=body.project_id,
         )
         db.add(formula)
         for phase, item in items:
@@ -162,6 +164,7 @@ def update_formula(
         formula.category = body.category
         formula.batch_size_g = body.batch_size_g
         formula.notes = body.notes
+        formula.project_id = body.project_id
         for old in list(formula.ingredients):
             db.delete(old)
         for phase, item in items:

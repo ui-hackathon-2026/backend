@@ -39,6 +39,7 @@ class FormulaCreate(BaseModel):
     category: str | None = Field(default=None, max_length=128)
     batch_size_g: float = Field(default=500.0, gt=0)
     notes: str | None = Field(default=None, max_length=1024)
+    project_id: str | None = Field(default=None, max_length=64)
     phases: FormulaPhases
 
 
@@ -63,6 +64,7 @@ class FormulaResponse(BaseModel):
     category: str | None = None
     batch_size_g: float
     notes: str | None = None
+    project_id: str | None = None
     total_weight_pct: float
     status: str
     updated_at: datetime

@@ -120,6 +120,8 @@ on every audit.
 text) or `enhance` mode (reference formula + instruction, ref required).
 `POST /api/v1/uploads/brief` ingests a marketing PDF (max 10 MB) and
 returns extracted text with a preview. Order of use is never enforced.
+`GET /api/v1/projects/{id}/tree` composes the workspace view: brief,
+linked formulas with version and batch history, and chat sessions.
 
 ## Copilot
 
