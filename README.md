@@ -81,6 +81,14 @@ The default predictor is deterministic and clearly marked
 any `Predictor` implementation to `run_simulation`. Ingredients unknown
 to the `ingredients` catalog flip the OOD flag.
 
+## Formulas
+
+`POST /api/v1/formulas` accepts 4-phase ingredient groups
+(`phase_a` oil, `phase_b` water, `phase_c` emulsifier, `phase_d`
+heat-sensitive actives), validates the 100% mass balance, and returns
+`VALID_BALANCED`. Full CRUD plus append-only version snapshots on every
+update (`GET /api/v1/formulas/{id}/versions`).
+
 ## Test
 
 ```bash

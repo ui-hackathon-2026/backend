@@ -1,0 +1,79 @@
+from datetime import datetime
+
+from pydantic import BaseModel, Field
+
+from app.schemas.simulation import Phase
+
+
+class FormulaIngredientInput(BaseModel):
+    inci: str = Field(min_length=1, max_length=255)
+    name: str | None = Field(default=None, max_length=255)
+    smiles: str | None = Field(default=None, max_length=1024)
+    weight_pct: float = Field(gt=0, le=100)
+    is_locked: bool = False
+    is_solvent: bool = False
+
+
+class FormulaPhases(BaseModel):
+    phase_a: list[FormulaIngredientInput] = Field(default_factory=list)
+    phase_b: list[FormulaIngredientInput] = Field(default_factory=list)
+    phase_c: list[FormulaIngredientInput] = Field(default_factory=list)
+    phase_d: list[FormulaIngredientInput] = Field(default_factory=list)
+
+    def flattened(self) -> list[tuple[str, FormulaIngredientInput]]:
+        mapping = {
+            Phase.A: self.phase_a,
+            Phase.B: self.phase_b,
+            Phase.C: self.phase_c,
+            Phase.D: self.phase_d,
+        }
+        return [
+            (phase.value, item)
+            for phase, items in mapping.items()
+            for item in items
+        ]
+
+
+class FormulaCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    category: str | None = Field(default=None, max_length=128)
+    batch_size_g: float = Field(default=500.0, gt=0)
+    notes: str | None = Field(default=None, max_length=1024)
+    phases: FormulaPhases
+
+
+class FormulaUpdate(FormulaCreate):
+    pass
+
+
+class FormulaIngredientOutput(BaseModel):
+    inci: str
+    name: str | None = None
+    smiles: str | None = None
+    weight_pct: float
+    phase: str
+    is_locked: bool
+
+    model_config = {"from_attributes": True}
+
+
+class FormulaResponse(BaseModel):
+    formula_id: str
+    name: str
+    category: str | None = None
+    batch_size_g: float
+    notes: str | None = None
+    total_weight_pct: float
+    status: str
+    updated_at: datetime
+    ingredients: list[FormulaIngredientOutput] = Field(default_factory=list)
+
+    model_config = {"from_attributes": True}
+
+
+class FormulaVersionOutput(BaseModel):
+    version: int
+    snapshot: dict
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
