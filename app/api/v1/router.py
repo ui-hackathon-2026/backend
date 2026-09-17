@@ -12,6 +12,7 @@ from app.api.v1 import (
     optimize,
     projects,
     simulate,
+    workbench,
 )
 
 api_router = APIRouter()
@@ -27,3 +28,4 @@ api_router.include_router(copilot.router)
 api_router.include_router(optimize.router)
 api_router.include_router(batch.router)
 api_router.include_router(knowledge.router)
+api_router.include_router(workbench.router)

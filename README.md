@@ -128,6 +128,15 @@ Jaccard, cosine, and phase-chassis overlap against stored formulas.
 `GET /api/v1/suppliers` reads the supplier catalog. Patent FTO and 3D
 conformers honestly answer 503 until their engines connect.
 
+## Workbench
+
+`GET /api/v1/workbench/ingredients` reads the lab catalog with
+`phase`/`role`/`q`/`halal_only` filters. `POST
+/api/v1/workbench/calculate-moments` computes HLB, SOR, phase totals,
+COGS, TKDN, radar metrics, and warnings purely from request numbers.
+`POST /api/v1/workbench/formulas` saves a flat-ingredient draft into
+the canonical formula storage. Weights must sum 100% ± 1%.
+
 ## Test
 
 ```bash
