@@ -2,7 +2,8 @@
 
 Routes handle HTTP only, this module owns the inference contract.
 Predictor is the seam where the ML team plugs the real model,
-StubPredictor keeps the backend demoable until then.
+LightGBMPredictor runs the vendored training artifacts,
+StubPredictor keeps the backend demoable when artifacts are absent.
 """
 
 import secrets
@@ -12,10 +13,10 @@ from typing import Protocol
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import DatabaseUnavailableError, FormulaWeightError
+from app.ml.predictor import LightGBMPredictor, get_lightgbm_predictor
 from app.models.ingredient import Ingredient
 from app.models.simulation_run import SimulationRun
 from app.schemas.simulation import (
-    Engine,
     SimulationRequest,
     SimulationResponse,
     Verdict,
@@ -29,6 +30,7 @@ HIGHLY_STABLE_MIN = 0.85
 MODERATELY_STABLE_MIN = 0.70
 UNSTABLE_RISK_MIN = 0.50
 
+REAL_ENGINE_LABEL = "LIGHTGBM_GPU"
 STUB_ENGINE_LABEL = "STUB_DETERMINISTIC"
 
 
@@ -49,8 +51,7 @@ class StubPredictor:
         if features["delta_hlb"] > 2.0:
             score -= 0.12
         score = min(0.98, max(0.05, score))
-        unknown = features["unknown_incis"]
-        ood = len(unknown) > 0
+        ood = len(features["unknown_incis"]) > 0
         viscosity = round(
             4200 + features["oil_pct"] * 90 + features["thickener_pct"] * 4000, 1
         )
@@ -60,13 +61,11 @@ class StubPredictor:
         )
         return {
             "stability_score": round(score, 3),
-            "is_out_of_distribution": ood,
-            "ood_mahalanobis_distance": round(3.2 + 0.3 * len(unknown), 2)
-            if ood
-            else 1.15,
+            "phase_separation_prob": 0.9 if score < 0.5 else 0.08,
             "confidence_score": 0.62 if ood else 0.985,
             "dynamic_viscosity_mpas": viscosity,
             "mean_droplet_size_nm": droplet,
+            "polydispersity_index": 0.142,
         }
 
 
@@ -80,34 +79,30 @@ def map_verdict(score: float) -> Verdict:
     return Verdict.PHASE_SEPARATION_IMMINENT
 
 
-def extract_features(
-    db: Session, request: SimulationRequest
-) -> dict:
+def role_sum(request: SimulationRequest, role: str) -> float:
+    return sum(
+        i.weight_pct for i in request.ingredients if i.role.value == role
+    )
+
+
+def extract_features(db: Session, request: SimulationRequest) -> dict:
     total = sum(i.weight_pct for i in request.ingredients)
     if not (WEIGHT_SUM_MIN <= total <= WEIGHT_SUM_MAX):
         raise FormulaWeightError(f"weights sum to {total}, expected 100")
     try:
-        known_incis = {
-            row.inci for row in db.query(Ingredient.inci).all()
-        }
+        known_incis = {row.inci for row in db.query(Ingredient.inci).all()}
     except Exception as exc:
         raise DatabaseUnavailableError(str(exc)) from exc
     oil_pct = sum(i.weight_pct for i in request.ingredients if i.phase.value == "A")
-    emulsifier_pct = sum(
-        i.weight_pct for i in request.ingredients if i.role.value == "emulsifier"
-    )
-    thickener_pct = sum(
-        i.weight_pct for i in request.ingredients if i.role.value == "thickener"
-    )
+    emulsifier_pct = role_sum(request, "emulsifier")
+    thickener_pct = role_sum(request, "thickener")
     hlb_weights = [
         (i.hlb, i.weight_pct)
         for i in request.ingredients
         if i.role.value == "emulsifier" and i.hlb is not None
     ]
     if hlb_weights:
-        avg_hlb = sum(h * w for h, w in hlb_weights) / sum(
-            w for _, w in hlb_weights
-        )
+        avg_hlb = sum(h * w for h, w in hlb_weights) / sum(w for _, w in hlb_weights)
         delta_hlb = round(abs(avg_hlb - REQUIRED_HLB), 2)
     else:
         delta_hlb = 2.5
@@ -116,12 +111,35 @@ def extract_features(
         "oil_pct": oil_pct,
         "emulsifier_pct": emulsifier_pct,
         "thickener_pct": thickener_pct,
+        "solvent_pct": role_sum(request, "solvent"),
+        "humectant_pct": role_sum(request, "humectant"),
+        "active_pct": role_sum(request, "active"),
+        "preservative_pct": role_sum(request, "preservative"),
+        "ingredient_count": len(request.ingredients),
+        "temperature_c": request.temperature_c,
+        "duration_days": request.duration_days,
         "delta_hlb": delta_hlb,
         "sor": sor,
         "unknown_incis": [
             i.inci for i in request.ingredients if i.inci not in known_incis
         ],
     }
+
+
+def resolve_predictor(
+    predictor: Predictor | None,
+) -> tuple[Predictor, str, bool]:
+    if predictor is not None:
+        label = (
+            REAL_ENGINE_LABEL
+            if isinstance(predictor, LightGBMPredictor)
+            else STUB_ENGINE_LABEL
+        )
+        return predictor, label, label == STUB_ENGINE_LABEL
+    try:
+        return get_lightgbm_predictor(), REAL_ENGINE_LABEL, False
+    except Exception:
+        return StubPredictor(), STUB_ENGINE_LABEL, True
 
 
 def build_response(
@@ -131,9 +149,13 @@ def build_response(
     run_id: str,
     duration_ms: float,
     created_at,
+    engine_used: str,
+    is_stub: bool,
 ) -> SimulationResponse:
     viscosity = metrics["dynamic_viscosity_mpas"]
     verdict = map_verdict(metrics["stability_score"])
+    unknown = features["unknown_incis"]
+    ood = len(unknown) > 0
     risks: list[str] = []
     if features["emulsifier_pct"] <= 0:
         risks.append("No emulsifier present, phase separation is imminent.")
@@ -145,10 +167,12 @@ def build_response(
         risks.append(
             f"Emulsifier HLB deviates {features['delta_hlb']} from the required {REQUIRED_HLB}."
         )
-    if features["unknown_incis"]:
+    if metrics["phase_separation_prob"] > 0.5:
         risks.append(
-            f"{len(features['unknown_incis'])} ingredient(s) outside the training catalog."
+            f"Model estimates phase separation probability {metrics['phase_separation_prob']}."
         )
+    if unknown:
+        risks.append(f"{len(unknown)} ingredient(s) outside the training catalog.")
     stabilizing = [
         f"Surfactant-to-oil ratio {features['sor']} supports lamellar gel network formation.",
         "Negative Gibbs free energy of emulsification keeps droplet formation spontaneous.",
@@ -164,21 +188,21 @@ def build_response(
         formula_name=request.formula_name,
         temperature_c=request.temperature_c,
         duration_days=request.duration_days,
-        engine_used=request.engine.value
-        if request.engine == Engine.DEEP_COLLOID_GNN
-        else STUB_ENGINE_LABEL,
-        is_stub=request.engine == Engine.LIGHTGBM_GPU,
+        engine_used=engine_used,
+        is_stub=is_stub,
         inference_duration_ms=round(duration_ms, 2),
         created_at=created_at,
         stability_score_40c_90days=metrics["stability_score"],
         verdict=verdict,
         confidence_score=metrics["confidence_score"],
-        is_out_of_distribution=metrics["is_out_of_distribution"],
-        ood_mahalanobis_distance=metrics["ood_mahalanobis_distance"],
+        is_out_of_distribution=ood,
+        ood_mahalanobis_distance=round(3.2 + 0.3 * len(unknown), 2)
+        if ood
+        else 1.15,
         dynamic_viscosity_mpas=viscosity,
         target_viscosity_mpas=5500.0,
         mean_droplet_size_nm=metrics["mean_droplet_size_nm"],
-        polydispersity_index_pdi=0.142,
+        polydispersity_index_pdi=metrics["polydispersity_index"],
         droplet_distribution=[
             {"diameter_nm": 60.0, "volume_frequency_pct": 2.1},
             {"diameter_nm": 100.0, "volume_frequency_pct": 14.8},
@@ -214,9 +238,14 @@ def run_simulation(
     predictor: Predictor | None = None,
 ) -> SimulationResponse:
     features = extract_features(db, request)
-    active = predictor or StubPredictor()
+    active, engine_used, is_stub = resolve_predictor(predictor)
     started = time.perf_counter()
-    metrics = active.predict(features)
+    try:
+        metrics = active.predict(features)
+    except Exception:
+        active, engine_used, is_stub = StubPredictor(), STUB_ENGINE_LABEL, True
+        started = time.perf_counter()
+        metrics = active.predict(features)
     duration_ms = (time.perf_counter() - started) * 1000
     run_id = f"run_sim_{int(time.time())}_{secrets.token_hex(3)}"
     try:
@@ -226,14 +255,12 @@ def run_simulation(
             formula_name=request.formula_name,
             temperature_c=request.temperature_c,
             duration_days=request.duration_days,
-            engine_used=request.engine.value
-            if request.engine == Engine.DEEP_COLLOID_GNN
-            else STUB_ENGINE_LABEL,
+            engine_used=engine_used,
             stability_score=metrics["stability_score"],
             verdict=map_verdict(metrics["stability_score"]).value,
             mean_droplet_size_nm=metrics["mean_droplet_size_nm"],
             dynamic_viscosity_mpas=metrics["dynamic_viscosity_mpas"],
-            is_out_of_distribution=metrics["is_out_of_distribution"],
+            is_out_of_distribution=len(features["unknown_incis"]) > 0,
             raw_response={},
         )
         db.add(row)
@@ -243,7 +270,8 @@ def run_simulation(
         db.rollback()
         raise DatabaseUnavailableError(str(exc)) from exc
     response = build_response(
-        request, features, metrics, run_id, duration_ms, row.created_at
+        request, features, metrics, run_id, duration_ms, row.created_at,
+        engine_used, is_stub,
     )
     try:
         row.raw_response = response.model_dump(mode="json")

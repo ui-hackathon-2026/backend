@@ -76,10 +76,14 @@ alembic upgrade head
 100%, else 400), runs the predictor, and persists the run.
 `GET /api/v1/simulate/stability/{run_id}` returns the stored result.
 
-The default predictor is deterministic and clearly marked
-(`engine_used: STUB_DETERMINISTIC`, `is_stub: true`). Swap it by passing
-any `Predictor` implementation to `run_simulation`. Ingredients unknown
-to the `ingredients` catalog flip the OOD flag.
+The default predictor runs the vendored LightGBM training artifacts
+(`app/ml/artifacts`, 7 targets: stability, phase separation,
+feasibility, viscosity, droplet size, PDI, pH) and reports
+`engine_used: LIGHTGBM_GPU`. When artifacts are missing or inference
+fails, it falls back to a deterministic stub clearly marked
+(`engine_used: STUB_DETERMINISTIC`, `is_stub: true`). Swap engines by
+passing any `Predictor` implementation to `run_simulation`. Ingredients
+unknown to the `ingredients` catalog flip the OOD flag.
 
 ## Formulas
 

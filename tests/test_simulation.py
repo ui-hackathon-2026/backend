@@ -1,5 +1,6 @@
 from app.models.ingredient import Ingredient
-from app.services.simulation_service import map_verdict
+from app.ml.predictor import LightGBMPredictor
+from app.services.simulation_service import StubPredictor, map_verdict
 
 
 def ing(name, inci, smiles, pct, phase, role, hlb=None):
@@ -54,8 +55,8 @@ def test_simulate_ok_shape(client, db_session):
     body = r.json()
     assert body["run_id"].startswith("run_sim_")
     assert body["formula_id"] == "form_99482"
-    assert body["engine_used"] == "STUB_DETERMINISTIC"
-    assert body["is_stub"] is True
+    assert body["engine_used"] == "LIGHTGBM_GPU"
+    assert body["is_stub"] is False
     assert body["verdict"] in (
         "HIGHLY_STABLE",
         "MODERATELY_STABLE",
@@ -115,6 +116,42 @@ def test_stub_is_deterministic(client, db_session):
     assert first["run_id"] != second["run_id"]
     assert first["stability_score_40c_90days"] == second["stability_score_40c_90days"]
     assert first["thermodynamics"] == second["thermodynamics"]
+
+
+def test_stub_predictor_still_available(client, db_session):
+    from app.services.simulation_service import run_simulation
+    from app.schemas.simulation import SimulationRequest
+
+    seed_catalog(db_session)
+    request = SimulationRequest(**BALANCED_FORMULA)
+    response = run_simulation(db_session, request, predictor=StubPredictor())
+    assert response.engine_used == "STUB_DETERMINISTIC"
+    assert response.is_stub is True
+
+
+def test_lightgbm_predictor_loads_and_predicts():
+    predictor = LightGBMPredictor()
+    features = {
+        "oil_pct": 8.0,
+        "emulsifier_pct": 4.5,
+        "thickener_pct": 0.0,
+        "solvent_pct": 83.0,
+        "humectant_pct": 3.5,
+        "active_pct": 1.0,
+        "preservative_pct": 0.0,
+        "ingredient_count": 6,
+        "temperature_c": 40.0,
+        "duration_days": 90,
+        "delta_hlb": 3.5,
+        "sor": 0.562,
+        "unknown_incis": [],
+    }
+    first = predictor.predict(features)
+    second = predictor.predict(features)
+    assert first == second
+    assert 0.0 <= first["stability_score"] <= 1.0
+    assert first["dynamic_viscosity_mpas"] >= 0
+    assert first["mean_droplet_size_nm"] >= 0
 
 
 def test_verdict_thresholds():
