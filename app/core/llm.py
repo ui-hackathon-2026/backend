@@ -16,7 +16,6 @@ import httpx
 from app.core.config import settings
 from app.core.exceptions import LLMUnavailableError
 
-
 def load_groq_keys() -> list[str]:
     candidates = [os.environ.get("GROQ_API_KEY", "")]
     candidates += [os.environ.get(f"GROQ_API_KEY_{i}", "") for i in range(1, 21)]
@@ -26,7 +25,6 @@ def load_groq_keys() -> list[str]:
         if key and key not in seen:
             seen.append(key)
     return seen
-
 
 class GroqGateway:
     def __init__(
@@ -115,10 +113,8 @@ class GroqGateway:
             )
         raise LLMUnavailableError("all groq keys cooling down or unreachable")
 
-
 _gateway: GroqGateway | None = None
 _gateway_lock = threading.Lock()
-
 
 def get_groq_gateway() -> GroqGateway:
     global _gateway
