@@ -1,18 +1,11 @@
 from typing import Annotated
 
-from fastapi import Depends
-from sqlalchemy.orm import Session
-
-from app.core.database import get_db
-
-from typing import Annotated
-
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import decode_access_token
+from app.core.security import decode_token
 from app.models.user import User
 
 SessionDep = Annotated[Session, Depends(get_db)]
@@ -20,22 +13,26 @@ SessionDep = Annotated[Session, Depends(get_db)]
 bearer_scheme = HTTPBearer()
 
 
+def unauthorized() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="invalid or expired token",
+    )
+
+
 def get_current_user(
     db: SessionDep,
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
 ) -> User:
-    user_id = decode_access_token(credentials.credentials)
-    if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="invalid or expired token",
-        )
-    user = db.get(User, user_id)
+    payload = decode_token(credentials.credentials, "access")
+    if payload is None:
+        raise unauthorized()
+    try:
+        user = db.get(User, int(payload["sub"]))
+    except (KeyError, ValueError):
+        raise unauthorized()
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="invalid or expired token",
-        )
+        raise unauthorized()
     return user
 
 

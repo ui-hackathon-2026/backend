@@ -18,7 +18,6 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     secret_key: str = "dev-only-change-me"
-    access_token_expire_minutes: int = 60 * 24 * 7
 
     groq_base_url: str = "https://api.groq.com/openai/v1"
     groq_model_agent: str = "openai/gpt-oss-120b"

@@ -1,102 +1,123 @@
 from app.core.security import hash_password, verify_password
 
 
-def test_register_ok(client):
-    r = client.post(
+def register(client, name="Andi Wibowo", email="andi@example.com"):
+    return client.post(
         "/api/v1/auth/register",
-        json={"username": "formulator1", "password": "secret123"},
+        json={"name": name, "email": email, "password": "secret123"},
     )
+
+
+def test_register_ok_shape(client):
+    r = register(client)
     assert r.status_code == 201
     body = r.json()
-    assert body["username"] == "formulator1"
-    assert isinstance(body["id"], int)
-    assert "created_at" in body
-    assert "password_hash" not in body
-    assert "password" not in body
+    assert body["user"]["name"] == "Andi Wibowo"
+    assert body["user"]["email"] == "andi@example.com"
+    assert body["user"]["role"] == "formulator"
+    assert body["user"]["avatarInitials"] == "AW"
+    assert isinstance(body["user"]["id"], str)
+    assert body["tokens"]["expiresIn"] == 900
+    assert len(body["tokens"]["accessToken"]) > 20
+    assert len(body["tokens"]["refreshToken"]) > 20
+    assert "password_hash" not in r.text
+    assert "password" not in body["user"]
 
 
-def test_register_duplicate_username(client):
-    payload = {"username": "labchem", "password": "secret123"}
-    assert client.post("/api/v1/auth/register", json=payload).status_code == 201
-    r = client.post("/api/v1/auth/register", json=payload)
+def test_register_duplicate_email(client):
+    assert register(client).status_code == 201
+    r = register(client)
     assert r.status_code == 409
-    assert r.json() == {"detail": "username already taken"}
+    assert r.json() == {"detail": "email already registered"}
 
 
-def test_register_short_password_rejected(client):
-    r = client.post(
+def test_register_validation(client):
+    short = client.post(
         "/api/v1/auth/register",
-        json={"username": "labchem", "password": "12345"},
+        json={"name": "A", "email": "a@b.co", "password": "12345"},
     )
-    assert r.status_code == 422
-
-
-def test_register_short_username_rejected(client):
-    r = client.post(
+    assert short.status_code == 422
+    bad_email = client.post(
         "/api/v1/auth/register",
-        json={"username": "ab", "password": "secret123"},
+        json={"name": "Andi", "email": "not-an-email", "password": "secret123"},
     )
-    assert r.status_code == 422
+    assert bad_email.status_code == 422
 
 
-def test_login_ok_returns_bearer_token(client):
-    client.post(
-        "/api/v1/auth/register",
-        json={"username": "formulator2", "password": "secret123"},
-    )
+def test_login_ok_and_me(client):
+    register(client)
     r = client.post(
         "/api/v1/auth/login",
-        json={"username": "formulator2", "password": "secret123"},
+        json={"email": "andi@example.com", "password": "secret123"},
     )
     assert r.status_code == 200
-    assert r.json()["token_type"] == "bearer"
-    assert len(r.json()["access_token"]) > 20
-
-
-def test_login_wrong_password(client):
-    client.post(
-        "/api/v1/auth/register",
-        json={"username": "formulator3", "password": "secret123"},
-    )
-    r = client.post(
-        "/api/v1/auth/login",
-        json={"username": "formulator3", "password": "wrongpass"},
-    )
-    assert r.status_code == 401
-    assert r.json() == {"detail": "invalid username or password"}
-
-
-def test_login_unknown_user(client):
-    r = client.post(
-        "/api/v1/auth/login",
-        json={"username": "nobody", "password": "secret123"},
-    )
-    assert r.status_code == 401
-
-
-def test_me_ok(client):
-    client.post(
-        "/api/v1/auth/register",
-        json={"username": "formulator4", "password": "secret123"},
-    )
-    token = client.post(
-        "/api/v1/auth/login",
-        json={"username": "formulator4", "password": "secret123"},
-    ).json()["access_token"]
-    r = client.get(
+    token = r.json()["tokens"]["accessToken"]
+    me = client.get(
         "/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}
     )
+    assert me.status_code == 200
+    assert me.json()["email"] == "andi@example.com"
+
+
+def test_login_wrong_credentials(client):
+    register(client)
+    r = client.post(
+        "/api/v1/auth/login",
+        json={"email": "andi@example.com", "password": "wrongpass"},
+    )
+    assert r.status_code == 401
+    assert r.json() == {"detail": "invalid credentials"}
+    unknown = client.post(
+        "/api/v1/auth/login",
+        json={"email": "nobody@example.com", "password": "secret123"},
+    )
+    assert unknown.status_code == 401
+
+
+def test_refresh_rotates_and_old_rejected(client):
+    tokens = register(client).json()["tokens"]
+    r = client.post(
+        "/api/v1/auth/refresh", json={"refreshToken": tokens["refreshToken"]}
+    )
     assert r.status_code == 200
-    assert r.json()["username"] == "formulator4"
+    fresh = r.json()
+    assert fresh["refreshToken"] != tokens["refreshToken"]
+    assert fresh["expiresIn"] == 900
+    me = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {fresh['accessToken']}"},
+    )
+    assert me.status_code == 200
+    replay = client.post(
+        "/api/v1/auth/refresh", json={"refreshToken": tokens["refreshToken"]}
+    )
+    assert replay.status_code == 401
 
 
-def test_me_without_token_rejected(client):
-    assert client.get("/api/v1/auth/me").status_code == 401
+def test_logout_revokes(client):
+    tokens = register(client).json()["tokens"]
+    r = client.post(
+        "/api/v1/auth/logout", json={"refreshToken": tokens["refreshToken"]}
+    )
+    assert r.status_code == 204
+    again = client.post(
+        "/api/v1/auth/refresh", json={"refreshToken": tokens["refreshToken"]}
+    )
+    assert again.status_code == 401
 
 
-def test_me_with_bad_token_rejected(client):
+def test_refresh_bad_token(client):
+    r = client.post(
+        "/api/v1/auth/refresh", json={"refreshToken": "garbage-token-value"}
+    )
+    assert r.status_code == 401
+
+
+def test_me_rejects_refresh_token(client):
+    tokens = register(client).json()["tokens"]
     r = client.get(
-        "/api/v1/auth/me", headers={"Authorization": "Bearer not-a-token"}
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {tokens['refreshToken']}"},
     )
     assert r.status_code == 401
 
