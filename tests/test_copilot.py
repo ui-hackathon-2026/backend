@@ -39,7 +39,7 @@ def collect(db_session, body):
     return list(run_chat_events(db_session, ChatRequest(**body), FakeGateway()))
 
 
-def test_chat_creates_session_and_streams_events(client, db_session):
+def test_chat_creates_session_and_streams_events(authed_client, db_session):
     events = collect(db_session, {"message": "Buatkan moisturizer SPF 30 Niacinamide 2%"})
     kinds = [e["type"] for e in events]
     assert kinds[0] == "meta"
@@ -57,7 +57,7 @@ def test_chat_creates_session_and_streams_events(client, db_session):
     ]
 
 
-def test_chat_reuses_session_and_persists_messages(client, db_session):
+def test_chat_reuses_session_and_persists_messages(authed_client, db_session):
     first = collect(db_session, {"message": "halo"})[-1]
     sid = first["session_id"]
     assert sid.startswith("sess_")
@@ -72,12 +72,12 @@ def test_chat_reuses_session_and_persists_messages(client, db_session):
     assert db_session.get(ChatSession, sid) is not None
 
 
-def test_chat_endpoint_streams_sse(client, db_session, monkeypatch):
+def test_chat_endpoint_streams_sse(authed_client, db_session, monkeypatch):
     import app.services.copilot_service as copilot_service
 
     fake = FakeGateway()
     monkeypatch.setattr(copilot_service, "get_groq_gateway", lambda: fake)
-    r = client.post(
+    r = authed_client.post(
         "/api/v1/copilot/chat", json={"message": "Buatkan sunscreen ringan"}
     )
     assert r.status_code == 200

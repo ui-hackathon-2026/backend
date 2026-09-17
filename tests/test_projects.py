@@ -26,8 +26,8 @@ def make_pdf(line: bytes) -> bytes:
 MINIMAL_PDF = make_pdf(b"Sunscreen SPF 30 brief")
 
 
-def test_create_project_new(client):
-    r = client.post(
+def test_create_project_new(authed_client):
+    r = authed_client.post(
         "/api/v1/projects",
         json={"name": "Sunscreen Serum", "brief_text": "SPF 50 watery light"},
     )
@@ -37,23 +37,23 @@ def test_create_project_new(client):
     assert body["mode"] == "new"
 
 
-def test_create_project_enhance_requires_ref(client):
-    r = client.post(
+def test_create_project_enhance_requires_ref(authed_client):
+    r = authed_client.post(
         "/api/v1/projects",
         json={"name": "Enhance", "mode": "enhance", "instruction": "raise tkdn"},
     )
     assert r.status_code == 422
 
 
-def test_create_project_enhance_ok_and_list(client):
-    formula = client.post(
+def test_create_project_enhance_ok_and_list(authed_client):
+    formula = authed_client.post(
         "/api/v1/formulas",
         json={
             "name": "Base",
             "phases": {"phase_b": [{"inci": "Aqua", "weight_pct": 100.0}]},
         },
     ).json()
-    r = client.post(
+    r = authed_client.post(
         "/api/v1/projects",
         json={
             "name": "Enhance",
@@ -64,14 +64,14 @@ def test_create_project_enhance_ok_and_list(client):
     )
     assert r.status_code == 201
     pid = r.json()["project_id"]
-    assert client.get(f"/api/v1/projects/{pid}").status_code == 200
-    listing = client.get("/api/v1/projects").json()
+    assert authed_client.get(f"/api/v1/projects/{pid}").status_code == 200
+    listing = authed_client.get("/api/v1/projects").json()
     assert any(p["project_id"] == pid for p in listing)
-    assert client.get("/api/v1/projects/proj_nope").status_code == 404
+    assert authed_client.get("/api/v1/projects/proj_nope").status_code == 404
 
 
-def test_upload_brief_pdf(client):
-    r = client.post(
+def test_upload_brief_pdf(authed_client):
+    r = authed_client.post(
         "/api/v1/uploads/brief",
         files={"file": ("brief.pdf", MINIMAL_PDF, "application/pdf")},
     )
@@ -82,19 +82,19 @@ def test_upload_brief_pdf(client):
     assert body["char_count"] > 0
 
 
-def test_upload_brief_rejects_non_pdf(client):
-    r = client.post(
+def test_upload_brief_rejects_non_pdf(authed_client):
+    r = authed_client.post(
         "/api/v1/uploads/brief",
         files={"file": ("notes.txt", b"hello", "text/plain")},
     )
     assert r.status_code == 422
 
 
-def test_project_tree(client):
-    pid = client.post(
+def test_project_tree(authed_client):
+    pid = authed_client.post(
         "/api/v1/projects", json={"name": "Tree Demo"}
     ).json()["project_id"]
-    fid = client.post(
+    fid = authed_client.post(
         "/api/v1/formulas",
         json={
             "name": "Linked",
@@ -102,7 +102,7 @@ def test_project_tree(client):
             "phases": {"phase_b": [{"inci": "Aqua", "weight_pct": 100.0}]},
         },
     ).json()["formula_id"]
-    client.put(
+    authed_client.put(
         f"/api/v1/formulas/{fid}",
         json={
             "name": "Linked v2",
@@ -110,11 +110,11 @@ def test_project_tree(client):
             "phases": {"phase_b": [{"inci": "Aqua", "weight_pct": 100.0}]},
         },
     )
-    client.post(
+    authed_client.post(
         "/api/v1/batch-sheet/generate",
         json={"formula_id": fid, "batch_size_grams": 500.0},
     )
-    body = client.get(f"/api/v1/projects/{pid}/tree").json()
+    body = authed_client.get(f"/api/v1/projects/{pid}/tree").json()
     assert body["project_id"] == pid
     assert body["brief"] is None
     assert len(body["formulas"]) == 1
@@ -122,4 +122,4 @@ def test_project_tree(client):
     assert len(body["formulas"][0]["versions"]) == 1
     assert len(body["formulas"][0]["batch_records"]) == 1
     assert body["chat_sessions"] == []
-    assert client.get("/api/v1/projects/proj_nope/tree").status_code == 404
+    assert authed_client.get("/api/v1/projects/proj_nope/tree").status_code == 404

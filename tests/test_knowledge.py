@@ -10,7 +10,7 @@ def formula_payload():
     }
 
 
-def test_optimize_returns_top3_and_scatter(client, db_session):
+def test_optimize_returns_top3_and_scatter(authed_client, db_session):
     from app.models.ingredient import Ingredient
 
     for inci, cost, tkdn in [
@@ -26,7 +26,7 @@ def test_optimize_returns_top3_and_scatter(client, db_session):
             )
         )
     db_session.commit()
-    r = client.post(
+    r = authed_client.post(
         "/api/v1/optimize/pareto?seed=7",
         json={
             "num_trials": 10,
@@ -42,15 +42,15 @@ def test_optimize_returns_top3_and_scatter(client, db_session):
     for cand in body["top_candidates"]:
         assert cand["recipe"]["Niacinamide"] == 2.0
         assert abs(sum(cand["recipe"].values()) - 100.0) < 0.05
-    got = client.get(f"/api/v1/optimize/pareto/{body['experiment_id']}")
+    got = authed_client.get(f"/api/v1/optimize/pareto/{body['experiment_id']}")
     assert got.status_code == 200
     assert got.json()["experiment_id"] == body["experiment_id"]
-    assert client.get("/api/v1/optimize/pareto/exp_nope").status_code == 404
+    assert authed_client.get("/api/v1/optimize/pareto/exp_nope").status_code == 404
 
 
-def test_batch_generate_grams(client):
-    fid = client.post("/api/v1/formulas", json=formula_payload()).json()["formula_id"]
-    r = client.post(
+def test_batch_generate_grams(authed_client):
+    fid = authed_client.post("/api/v1/formulas", json=formula_payload()).json()["formula_id"]
+    r = authed_client.post(
         "/api/v1/batch-sheet/generate",
         json={"formula_id": fid, "batch_size_grams": 500.0, "operator_name": "Rina"},
     )
@@ -67,7 +67,7 @@ def test_batch_generate_grams(client):
     assert all(
         set(entry) == {"label", "shap_value"} for entry in body["shap_contributions"]
     )
-    assert client.post(
+    assert authed_client.post(
         "/api/v1/batch-sheet/generate",
         json={"formula_id": "form_nope", "batch_size_grams": 500.0},
     ).status_code == 404
@@ -90,22 +90,22 @@ def test_shap_additivity():
     assert 0.0 <= predicted <= 1.0
 
 
-def test_batch_download_pdf(client):
-    fid = client.post("/api/v1/formulas", json=formula_payload()).json()["formula_id"]
-    record_id = client.post(
+def test_batch_download_pdf(authed_client):
+    fid = authed_client.post("/api/v1/formulas", json=formula_payload()).json()["formula_id"]
+    record_id = authed_client.post(
         "/api/v1/batch-sheet/generate",
         json={"formula_id": fid, "batch_size_grams": 500.0},
     ).json()["batch_record_id"]
-    r = client.get(f"/api/v1/batch-sheet/download/{record_id}")
+    r = authed_client.get(f"/api/v1/batch-sheet/download/{record_id}")
     assert r.status_code == 200
     assert r.headers["content-type"] == "application/pdf"
     assert r.content[:5] == b"%PDF-"
-    assert client.get("/api/v1/batch-sheet/download/MBMR-2099-999").status_code == 404
+    assert authed_client.get("/api/v1/batch-sheet/download/MBMR-2099-999").status_code == 404
 
 
-def test_similarity_self_match(client):
-    fid = client.post("/api/v1/formulas", json=formula_payload()).json()["formula_id"]
-    r = client.post(
+def test_similarity_self_match(authed_client):
+    fid = authed_client.post("/api/v1/formulas", json=formula_payload()).json()["formula_id"]
+    r = authed_client.post(
         "/api/v1/similarity/check",
         json={
             "ingredients": [
@@ -123,8 +123,8 @@ def test_similarity_self_match(client):
     assert top["cosine"] == 1.0
 
 
-def test_unconnected_engines_503(client):
-    r = client.post(
+def test_unconnected_engines_503(authed_client):
+    r = authed_client.post(
         "/api/v1/patents/fto-check",
         json={"ingredients": [{"inci": "Aqua", "weight_pct": 100.0}]},
     )
@@ -132,8 +132,8 @@ def test_unconnected_engines_503(client):
     assert r.json() == {"detail": "patent engine not connected"}
 
 
-def test_conformer_niacinamide(client):
-    r = client.post(
+def test_conformer_niacinamide(authed_client):
+    r = authed_client.post(
         "/api/v1/molecules/conformer-3d",
         json={"smiles": "C1=CC(=CN=C1)C(=O)N", "name": "Niacinamide"},
     )
@@ -151,8 +151,8 @@ def test_conformer_niacinamide(client):
     assert set(body["bonds"][0]) == {"source", "target", "order"}
 
 
-def test_conformer_green_tea_marker(client):
-    r = client.post(
+def test_conformer_green_tea_marker(authed_client):
+    r = authed_client.post(
         "/api/v1/molecules/conformer-3d",
         json={"smiles": "C48H78O19", "name": "Green Tea Extract"},
     )
@@ -163,15 +163,15 @@ def test_conformer_green_tea_marker(client):
     assert "HETATM" in body["pdb_content"]
 
 
-def test_conformer_invalid_smiles(client):
-    r = client.post(
+def test_conformer_invalid_smiles(authed_client):
+    r = authed_client.post(
         "/api/v1/molecules/conformer-3d",
         json={"smiles": "not-a-molecule!!!", "name": "Bogus"},
     )
     assert r.status_code == 422
 
 
-def test_suppliers_list_and_filter(client, db_session):
+def test_suppliers_list_and_filter(authed_client, db_session):
     from app.models.catalog import Supplier
 
     db_session.add(
@@ -189,12 +189,12 @@ def test_suppliers_list_and_filter(client, db_session):
         )
     )
     db_session.commit()
-    body = client.get("/api/v1/suppliers").json()
+    body = authed_client.get("/api/v1/suppliers").json()
     assert len(body) == 2
     assert body[0]["halal_certified"] is True
     assert "is_synthetic" in body[0]
     assert "city" in body[0]
-    filtered = client.get("/api/v1/suppliers?inci=Aqua").json()
+    filtered = authed_client.get("/api/v1/suppliers?inci=Aqua").json()
     assert len(filtered) == 1
     assert filtered[0]["ingredient_inci"] == "Aqua"
 
@@ -207,7 +207,7 @@ def test_normalize_synonyms():
     assert normalize_name("Parfum") == "fragrance"
 
 
-def test_external_novelty(client, db_session):
+def test_external_novelty(authed_client, db_session):
     from app.models.competitor import CompetitorProduct
 
     db_session.add(
@@ -227,7 +227,7 @@ def test_external_novelty(client, db_session):
         )
     )
     db_session.commit()
-    r = client.post(
+    r = authed_client.post(
         "/api/v1/similarity/external",
         json={
             "ingredients": [

@@ -48,9 +48,9 @@ def seed_catalog(db_session):
     db_session.commit()
 
 
-def test_simulate_ok_shape(client, db_session):
+def test_simulate_ok_shape(authed_client, db_session):
     seed_catalog(db_session)
-    r = client.post("/api/v1/simulate/stability", json=BALANCED_FORMULA)
+    r = authed_client.post("/api/v1/simulate/stability", json=BALANCED_FORMULA)
     assert r.status_code == 200
     body = r.json()
     assert body["run_id"].startswith("run_sim_")
@@ -72,53 +72,53 @@ def test_simulate_ok_shape(client, db_session):
     assert isinstance(body["recommendations"], list)
 
 
-def test_simulate_bad_weight_sum_returns_400(client, db_session):
+def test_simulate_bad_weight_sum_returns_400(authed_client, db_session):
     seed_catalog(db_session)
     payload = dict(BALANCED_FORMULA)
     payload["ingredients"] = BALANCED_FORMULA["ingredients"][:4]
-    r = client.post("/api/v1/simulate/stability", json=payload)
+    r = authed_client.post("/api/v1/simulate/stability", json=payload)
     assert r.status_code == 400
     assert "100" in r.json()["detail"]
 
 
-def test_get_run_roundtrip(client, db_session):
+def test_get_run_roundtrip(authed_client, db_session):
     seed_catalog(db_session)
-    created = client.post("/api/v1/simulate/stability", json=BALANCED_FORMULA).json()
-    r = client.get(f"/api/v1/simulate/stability/{created['run_id']}")
+    created = authed_client.post("/api/v1/simulate/stability", json=BALANCED_FORMULA).json()
+    r = authed_client.get(f"/api/v1/simulate/stability/{created['run_id']}")
     assert r.status_code == 200
     assert r.json()["run_id"] == created["run_id"]
     assert r.json()["stability_score_40c_90days"] == created["stability_score_40c_90days"]
 
 
-def test_get_run_missing_returns_404(client):
-    r = client.get("/api/v1/simulate/stability/run_sim_missing")
+def test_get_run_missing_returns_404(authed_client):
+    r = authed_client.get("/api/v1/simulate/stability/run_sim_missing")
     assert r.status_code == 404
     assert r.json() == {"detail": "Simulation run not found"}
 
 
-def test_ood_flag_for_unknown_ingredient(client, db_session):
+def test_ood_flag_for_unknown_ingredient(authed_client, db_session):
     seed_catalog(db_session)
-    body = client.post("/api/v1/simulate/stability", json=BALANCED_FORMULA).json()
+    body = authed_client.post("/api/v1/simulate/stability", json=BALANCED_FORMULA).json()
     assert body["is_out_of_distribution"] is False
     payload = dict(BALANCED_FORMULA)
     payload["ingredients"] = BALANCED_FORMULA["ingredients"] + [
         ing("Mystery Extract", "Mysteryus Extractus", "CCOCC", 0.5, "D", "active")
     ]
     payload["ingredients"][5] = dict(payload["ingredients"][5], weight_pct=82.5)
-    body = client.post("/api/v1/simulate/stability", json=payload).json()
+    body = authed_client.post("/api/v1/simulate/stability", json=payload).json()
     assert body["is_out_of_distribution"] is True
 
 
-def test_stub_is_deterministic(client, db_session):
+def test_stub_is_deterministic(authed_client, db_session):
     seed_catalog(db_session)
-    first = client.post("/api/v1/simulate/stability", json=BALANCED_FORMULA).json()
-    second = client.post("/api/v1/simulate/stability", json=BALANCED_FORMULA).json()
+    first = authed_client.post("/api/v1/simulate/stability", json=BALANCED_FORMULA).json()
+    second = authed_client.post("/api/v1/simulate/stability", json=BALANCED_FORMULA).json()
     assert first["run_id"] != second["run_id"]
     assert first["stability_score_40c_90days"] == second["stability_score_40c_90days"]
     assert first["thermodynamics"] == second["thermodynamics"]
 
 
-def test_stub_predictor_still_available(client, db_session):
+def test_stub_predictor_still_available(authed_client, db_session):
     from app.services.simulation_service import run_simulation
     from app.schemas.simulation import SimulationRequest
 
@@ -162,10 +162,10 @@ def test_verdict_thresholds():
     assert map_verdict(0.20).value == "PHASE_SEPARATION_IMMINENT"
 
 
-def test_smiles_with_whitespace_rejected(client):
+def test_smiles_with_whitespace_rejected(authed_client):
     payload = dict(BALANCED_FORMULA)
     payload["ingredients"] = [
         ing("Bad", "Badinci", "CC C", 100.0, "B", "solvent")
     ]
-    r = client.post("/api/v1/simulate/stability", json=payload)
+    r = authed_client.post("/api/v1/simulate/stability", json=payload)
     assert r.status_code == 422

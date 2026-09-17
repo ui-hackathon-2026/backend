@@ -39,28 +39,28 @@ def moments_payload():
     }
 
 
-def test_ingredients_filters(client, db_session):
+def test_ingredients_filters(authed_client, db_session):
     seed(db_session)
-    all_items = client.get("/api/v1/workbench/ingredients").json()
+    all_items = authed_client.get("/api/v1/workbench/ingredients").json()
     assert all_items["total"] == 3
     assert all_items["items"][0]["id"].startswith("cat-")
     first = all_items["items"][0]
     assert first["isHalal"] is True
     assert first["phase"] in ("A", "B", "C", "D")
     assert "weightPct" in first and "costPerKgIdr" in first
-    phase_d = client.get("/api/v1/workbench/ingredients?phase=D").json()
+    phase_d = authed_client.get("/api/v1/workbench/ingredients?phase=D").json()
     assert phase_d["total"] == 1
     assert phase_d["items"][0]["inci"] == "Niacinamide"
-    query = client.get("/api/v1/workbench/ingredients?q=niacinamide").json()
+    query = authed_client.get("/api/v1/workbench/ingredients?q=niacinamide").json()
     assert query["total"] == 1
-    halal = client.get("/api/v1/workbench/ingredients?halal_only=true").json()
+    halal = authed_client.get("/api/v1/workbench/ingredients?halal_only=true").json()
     assert halal["total"] == 3
-    role = client.get("/api/v1/workbench/ingredients?role=emulsifier").json()
+    role = authed_client.get("/api/v1/workbench/ingredients?role=emulsifier").json()
     assert role["total"] == 1
 
 
-def test_calculate_moments_math(client):
-    r = client.post("/api/v1/workbench/calculate-moments", json=moments_payload())
+def test_calculate_moments_math(authed_client):
+    r = authed_client.post("/api/v1/workbench/calculate-moments", json=moments_payload())
     assert r.status_code == 200
     body = r.json()
     assert body["system_hlb"] == 11.0
@@ -78,10 +78,10 @@ def test_calculate_moments_math(client):
     assert body["warnings"] == []
 
 
-def test_calculate_moments_warnings_and_400(client):
+def test_calculate_moments_warnings_and_400(authed_client):
     bad = moments_payload()
     bad["ingredients"] = [dict(i, weight_pct=10.0) for i in bad["ingredients"]]
-    r = client.post("/api/v1/workbench/calculate-moments", json=bad)
+    r = authed_client.post("/api/v1/workbench/calculate-moments", json=bad)
     assert r.status_code == 400
     assert r.json() == {"detail": "Total formula concentration must sum to 100% ± 1.0%"}
     no_emulsifier = moments_payload()
@@ -89,13 +89,13 @@ def test_calculate_moments_warnings_and_400(client):
         {"name": "Aqua", "inci": "Aqua", "smiles": "O", "weight_pct": 100.0,
          "phase": "B", "role": "solvent"}
     ]
-    body = client.post("/api/v1/workbench/calculate-moments", json=no_emulsifier).json()
+    body = authed_client.post("/api/v1/workbench/calculate-moments", json=no_emulsifier).json()
     assert body["warnings"][0]["code"] == "NO_EMULSIFIER"
     assert body["warnings"][0]["severity"] == "error"
 
 
-def test_save_draft_roundtrip(client):
-    r = client.post(
+def test_save_draft_roundtrip(authed_client):
+    r = authed_client.post(
         "/api/v1/workbench/formulas",
         json={
             "name": "Hydra-Barrier v2", "category": "Gel-Cream",
@@ -110,13 +110,13 @@ def test_save_draft_roundtrip(client):
     body = r.json()
     assert set(body) == {"id", "name", "category", "batch_size_g", "created_at", "updated_at"}
     assert body["name"] == "Hydra-Barrier v2"
-    stored = client.get(f"/api/v1/formulas/{body['id']}").json()
+    stored = authed_client.get(f"/api/v1/formulas/{body['id']}").json()
     assert stored["total_weight_pct"] == 100.0
     assert len(stored["ingredients"]) == 2
 
 
-def test_save_draft_bad_sum(client):
-    r = client.post(
+def test_save_draft_bad_sum(authed_client):
+    r = authed_client.post(
         "/api/v1/workbench/formulas",
         json={
             "name": "Bad", "batch_size_g": 100.0,
