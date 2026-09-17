@@ -45,7 +45,6 @@ class AuthUser(BaseModel):
     id: str
     name: str
     email: str
-    role: str
     avatar_initials: str = Field(alias="avatarInitials")
     created_at: datetime = Field(alias="createdAt")
 

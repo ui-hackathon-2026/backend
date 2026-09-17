@@ -13,7 +13,7 @@ from app.models.formula import Formula, FormulaIngredient, FormulaVersion
 from app.models.ingredient import Ingredient
 from app.models.project import Brief, Project
 from app.models.simulation_run import SimulationRun
-from app.models.user import RefreshToken, User, UserRole
+from app.models.user import RefreshToken, User
 
 __all__ = [
     "Base",
@@ -33,5 +33,4 @@ __all__ = [
     "SimulationRun",
     "Supplier",
     "User",
-    "UserRole",
 ]

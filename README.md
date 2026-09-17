@@ -22,24 +22,33 @@ uvicorn app.main:app --reload --port 8000
 
 ## Auth
 
-Simple username + password accounts, no roles yet.
+Email + password accounts, authenticated users only, no roles.
 
 ```bash
 curl -X POST localhost:8000/api/v1/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"username": "rina", "password": "secret123"}'
+  -d '{"name": "Rina", "email": "rina@paragon.id", "password": "secret123"}'
 
 curl -X POST localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username": "rina", "password": "secret123"}'
+  -d '{"email": "rina@paragon.id", "password": "secret123"}'
+
+curl -X POST localhost:8000/api/v1/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refreshToken": "<refresh_token>"}'
+
+curl -X POST localhost:8000/api/v1/auth/logout \
+  -H "Content-Type: application/json" \
+  -d '{"refreshToken": "<refresh_token>"}'
 
 curl localhost:8000/api/v1/auth/me \
   -H "Authorization: Bearer <access_token>"
 ```
 
-Rules: username unique (3-50 chars), password min 6 chars, Argon2
-hashing, JWT Bearer valid 7 days. Protect any route with
-`CurrentUserDep` from `app.api.deps`.
+Rules: email unique, password min 6 chars, Argon2 hashing. Access
+tokens live 15 minutes, refresh tokens 7 days with rotation on every
+use and revocation on logout. Protect any route with `CurrentUserDep`
+from `app.api.deps`.
 
 ## Layout
 

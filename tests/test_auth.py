@@ -14,7 +14,7 @@ def test_register_ok_shape(client):
     body = r.json()
     assert body["user"]["name"] == "Andi Wibowo"
     assert body["user"]["email"] == "andi@example.com"
-    assert body["user"]["role"] == "formulator"
+    assert "role" not in body["user"]
     assert body["user"]["avatarInitials"] == "AW"
     assert isinstance(body["user"]["id"], str)
     assert body["tokens"]["expiresIn"] == 900

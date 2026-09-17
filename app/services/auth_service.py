@@ -43,7 +43,6 @@ def build_user(user: User) -> AuthUser:
         id=str(user.id),
         name=user.name,
         email=user.email,
-        role=user.role,
         avatarInitials=avatar_initials(user.name),
         createdAt=user.created_at,
     )

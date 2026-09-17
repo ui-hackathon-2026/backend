@@ -43,7 +43,7 @@ def downgrade() -> None:
     """Downgrade schema."""
     op.add_column('users', sa.Column('username', sa.VARCHAR(length=50), autoincrement=False, nullable=False))
     op.drop_index(op.f('ix_users_email'), table_name='users')
-    op.create_index(op.f('ix_users_username'), table_name='users', ['username'], unique=True)
+    op.create_index(op.f('ix_users_username'), 'users', ['username'], unique=True)
     op.drop_column('users', 'email')
     op.drop_column('users', 'name')
     op.drop_index(op.f('ix_refresh_tokens_user_id'), table_name='refresh_tokens')
