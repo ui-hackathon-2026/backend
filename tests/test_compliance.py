@@ -97,6 +97,9 @@ def test_compliant_audit_shape(client, db_session, monkeypatch):
     assert phenoxy["status"] == "PASSED"
     assert phenoxy["bpom_limit_pct"] == 1.0
     assert phenoxy["rag_citation"]["appendix"] == "Lampiran V"
+    assert phenoxy["ingredient_id"].startswith("ing-")
+    assert phenoxy["phase"] == "D"
+    assert phenoxy["role"] == "active"
     assert "sejuk" in body["llm_reasoning"]["mandatory_label_warnings"][0]
 
 

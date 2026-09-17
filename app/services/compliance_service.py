@@ -164,6 +164,8 @@ def audit_compliance(
                 name=item.name,
                 inci=item.inci,
                 weight_pct=item.weight_pct,
+                phase=item.phase,
+                role=item.role,
                 status="FAILED" if over_limit or halal == "FAILED" else "PASSED",
                 bpom_limit_pct=limit.max_pct if limit else None,
                 halal_status=halal,

@@ -29,6 +29,8 @@ class IngredientAudit(BaseModel):
     name: str
     inci: str
     weight_pct: float
+    phase: str | None = None
+    role: str | None = None
     status: str
     bpom_limit_pct: float | None = None
     halal_status: str
