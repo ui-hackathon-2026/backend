@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.deps import SessionDep
+from app.api.deps import CurrentUserDep, SessionDep
 from app.schemas.workbench import (
     FormulaCompositionDto,
     FormulaMomentsDto,
@@ -34,5 +34,5 @@ def moments(body: FormulaCompositionDto) -> FormulaMomentsDto:
 
 
 @router.post("/formulas", response_model=WorkbenchSaveResponse, status_code=201)
-def save(body: WorkbenchSaveRequest, db: SessionDep) -> WorkbenchSaveResponse:
-    return save_draft(db, body)
+def save(body: WorkbenchSaveRequest, db: SessionDep, user: CurrentUserDep) -> WorkbenchSaveResponse:
+    return save_draft(db, body, owner_id=user.id)

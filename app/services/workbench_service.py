@@ -136,7 +136,7 @@ def calculate_moments(body: FormulaCompositionDto) -> FormulaMomentsDto:
     )
 
 
-def save_draft(db: Session, body: WorkbenchSaveRequest) -> WorkbenchSaveResponse:
+def save_draft(db: Session, body: WorkbenchSaveRequest, owner_id: int | None = None) -> WorkbenchSaveResponse:
     total = round(sum(i.weight_pct for i in body.ingredients), 2)
     if not (WEIGHT_SUM_MIN <= total <= WEIGHT_SUM_MAX):
         raise FormulaWeightError(WEIGHT_ERROR_MESSAGE)
@@ -164,6 +164,7 @@ def save_draft(db: Session, body: WorkbenchSaveRequest) -> WorkbenchSaveResponse
                 phase_c=groups["C"], phase_d=groups["D"],
             ),
         ),
+        owner_id=owner_id,
     )
     try:
         row = db.get(Formula, created.formula_id)
