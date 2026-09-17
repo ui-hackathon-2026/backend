@@ -9,14 +9,32 @@ from app.main import app
 
 
 @pytest.fixture()
-def client():
+def sqlite_engine():
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
     Base.metadata.create_all(engine)
-    TestingSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    yield engine
+    Base.metadata.drop_all(engine)
+
+
+@pytest.fixture()
+def db_session(sqlite_engine):
+    TestingSession = sessionmaker(
+        bind=sqlite_engine, autoflush=False, expire_on_commit=False
+    )
+    session = TestingSession()
+    yield session
+    session.close()
+
+
+@pytest.fixture()
+def client(sqlite_engine):
+    TestingSession = sessionmaker(
+        bind=sqlite_engine, autoflush=False, expire_on_commit=False
+    )
 
     def override_get_db():
         db = TestingSession()
@@ -29,4 +47,3 @@ def client():
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
-    Base.metadata.drop_all(engine)

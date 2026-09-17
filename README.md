@@ -70,6 +70,17 @@ alembic revision --autogenerate -m "add xyz"
 alembic upgrade head
 ```
 
+## Simulator
+
+`POST /api/v1/simulate/stability` validates formula weights (must sum
+100%, else 400), runs the predictor, and persists the run.
+`GET /api/v1/simulate/stability/{run_id}` returns the stored result.
+
+The default predictor is deterministic and clearly marked
+(`engine_used: STUB_DETERMINISTIC`, `is_stub: true`). Swap it by passing
+any `Predictor` implementation to `run_simulation`. Ingredients unknown
+to the `ingredients` catalog flip the OOD flag.
+
 ## Test
 
 ```bash

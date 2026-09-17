@@ -5,6 +5,8 @@ through Base.metadata.
 """
 
 from app.core.database import Base
-from app.models.user import User
+from app.models.ingredient import Ingredient
+from app.models.simulation_run import SimulationRun
+from app.models.user import User, UserRole
 
-__all__ = ["Base", "User"]
+__all__ = ["Base", "Ingredient", "SimulationRun", "User", "UserRole"]

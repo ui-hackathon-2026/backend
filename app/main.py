@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.database import engine
-from app.core.exceptions import DatabaseUnavailableError
+from app.core.exceptions import DatabaseUnavailableError, FormulaWeightError
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +42,10 @@ def create_app() -> FastAPI:
     async def db_unavailable_handler(request: Request, exc: DatabaseUnavailableError):
         logger.error("database unavailable: %s", exc)
         return JSONResponse(status_code=503, content={"detail": "database unavailable"})
+
+    @app.exception_handler(FormulaWeightError)
+    async def formula_weight_handler(request: Request, exc: FormulaWeightError):
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
 
     app.include_router(api_router, prefix="/api/v1")
 
