@@ -1,11 +1,12 @@
-"""Master batch sheet math and SOP template.
+"""Master batch sheet math, SOP template, and PDF rendering.
 
-Gram conversion is exact deterministic math. SHAP attribution and PDF
-rendering arrive with the ML and document layers.
+Gram conversion is exact deterministic math. SHAP attribution arrives
+with the ML layer.
 """
 
 from datetime import datetime
 
+from fpdf import FPDF
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import DatabaseUnavailableError
@@ -67,3 +68,51 @@ def generate_batch(db: Session, body: BatchGenerateRequest) -> BatchResponse | N
         sop_steps=sop_steps(body.batch_size_grams),
         created_at=record.created_at,
     )
+
+
+def get_batch_record(db: Session, record_id: str) -> BatchRecord | None:
+    try:
+        return db.get(BatchRecord, record_id)
+    except Exception as exc:
+        raise DatabaseUnavailableError(str(exc)) from exc
+
+
+def render_batch_pdf(
+    formula_name: str,
+    record: BatchRecord,
+    operator_name: str | None,
+) -> bytes:
+    pdf = FPDF(format="A4")
+    pdf.set_auto_page_break(auto=True, margin=20)
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, "Master Batch Manufacturing Record", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", "", 11)
+    pdf.cell(0, 7, f"Record: {record.id}    Formula: {formula_name}", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(
+        0, 7,
+        f"Batch: {record.batch_size_g:g} g    Operator: {operator_name or '-'}",
+        new_x="LMARGIN", new_y="NEXT",
+    )
+    pdf.ln(4)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "Weighing Sheet", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", "B", 10)
+    widths = (16, 92, 36, 36)
+    for header, width in zip(("Phase", "INCI", "Grams", "Checked"), widths):
+        pdf.cell(width, 7, header, border=1)
+    pdf.ln()
+    pdf.set_font("Helvetica", "", 10)
+    for item in record.scaled_ingredients:
+        pdf.cell(widths[0], 7, str(item.get("phase", "")), border=1)
+        pdf.cell(widths[1], 7, str(item.get("inci", ""))[:48], border=1)
+        pdf.cell(widths[2], 7, f"{item.get('grams', 0):g}", border=1)
+        pdf.cell(widths[3], 7, "[ ]", border=1)
+        pdf.ln()
+    pdf.ln(4)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "Manufacturing SOP", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", "", 10)
+    for number, step in enumerate(sop_steps(record.batch_size_g), start=1):
+        pdf.multi_cell(0, 6, f"{number}. {step}", new_x="LMARGIN", new_y="NEXT")
+    return bytes(pdf.output())
