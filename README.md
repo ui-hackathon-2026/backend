@@ -93,6 +93,13 @@ heat-sensitive actives), validates the 100% mass balance, and returns
 `VALID_BALANCED`. Full CRUD plus append-only version snapshots on every
 update (`GET /api/v1/formulas/{id}/versions`).
 
+## Compliance
+
+`POST /api/v1/compliance/audit` runs deterministic BPOM, halal, and
+TKDN checks with no ML involved. BPOM limits live in `bpom_limits`,
+halal and TKDN data in the `ingredients` catalog. Unknown ingredients
+are reported as unverified, never guessed.
+
 ## Test
 
 ```bash
