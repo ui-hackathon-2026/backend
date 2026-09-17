@@ -69,6 +69,19 @@ def test_batch_generate_grams(client):
     ).status_code == 404
 
 
+def test_batch_download_pdf(client):
+    fid = client.post("/api/v1/formulas", json=formula_payload()).json()["formula_id"]
+    record_id = client.post(
+        "/api/v1/batch-sheet/generate",
+        json={"formula_id": fid, "batch_size_grams": 500.0},
+    ).json()["batch_record_id"]
+    r = client.get(f"/api/v1/batch-sheet/download/{record_id}")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/pdf"
+    assert r.content[:5] == b"%PDF-"
+    assert client.get("/api/v1/batch-sheet/download/MBMR-2099-999").status_code == 404
+
+
 def test_similarity_self_match(client):
     fid = client.post("/api/v1/formulas", json=formula_payload()).json()["formula_id"]
     r = client.post(
@@ -96,12 +109,40 @@ def test_unconnected_engines_503(client):
     )
     assert r.status_code == 503
     assert r.json() == {"detail": "patent engine not connected"}
+
+
+def test_conformer_niacinamide(client):
     r = client.post(
         "/api/v1/molecules/conformer-3d",
-        json={"smiles": "O", "name": "Aqua"},
+        json={"smiles": "C1=CC(=CN=C1)C(=O)N", "name": "Niacinamide"},
     )
-    assert r.status_code == 503
-    assert r.json() == {"detail": "cheminformatics engine not connected"}
+    assert r.status_code == 200
+    body = r.json()
+    assert body["molecule_name"] == "Niacinamide"
+    assert body["format"] == "pdb"
+    assert "HETATM" in body["pdb_content"]
+    assert body["molecular_weight"] == 122.13
+    assert body["marker_compound"] is None
+
+
+def test_conformer_green_tea_marker(client):
+    r = client.post(
+        "/api/v1/molecules/conformer-3d",
+        json={"smiles": "C48H78O19", "name": "Green Tea Extract"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["molecule_name"] == "Epigallocatechin Gallate"
+    assert body["marker_compound"] == "Epigallocatechin Gallate"
+    assert "HETATM" in body["pdb_content"]
+
+
+def test_conformer_invalid_smiles(client):
+    r = client.post(
+        "/api/v1/molecules/conformer-3d",
+        json={"smiles": "not-a-molecule!!!", "name": "Bogus"},
+    )
+    assert r.status_code == 422
 
 
 def test_suppliers_empty_list(client):

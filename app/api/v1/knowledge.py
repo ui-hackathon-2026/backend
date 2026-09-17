@@ -9,6 +9,7 @@ from app.schemas.knowledge import (
     SimilarityResponse,
     SupplierResponse,
 )
+from app.services.molecules_service import ConformerError, conformer
 from app.services.similarity_service import check_similarity
 
 router = APIRouter(tags=["knowledge"])
@@ -27,12 +28,14 @@ def fto_check(body: FtoRequest, db: SessionDep):
     )
 
 
-@router.post("/molecules/conformer-3d", status_code=503)
-def conformer(body: ConformerRequest, db: SessionDep):
-    raise HTTPException(
-        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail="cheminformatics engine not connected",
-    )
+@router.post("/molecules/conformer-3d", status_code=200)
+def conformer_3d(body: ConformerRequest, db: SessionDep):
+    try:
+        return conformer(body.smiles, body.name)
+    except ConformerError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        )
 
 
 @router.get("/suppliers", response_model=list[SupplierResponse])

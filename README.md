@@ -140,8 +140,11 @@ vectorized surrogate batch, and returns Top-3 plus 3D scatter points.
 weights with SOP steps. `GET /api/v1/batch-sheet/download/{id}`
 returns the printable PDF batch record. `POST /api/v1/similarity/check` compares
 Jaccard, cosine, and phase-chassis overlap against stored formulas.
-`GET /api/v1/suppliers` reads the supplier catalog. Patent FTO and 3D
-conformers honestly answer 503 until their engines connect.
+`GET /api/v1/suppliers` reads the supplier catalog.
+`POST /api/v1/molecules/conformer-3d` returns RDKit MMFF94-minimized
+PDB structures with MW, LogP, and TPSA, resolving botanical extracts
+to marker compounds. Patent FTO honestly answers 503 until its engine
+connects.
 
 ## NSGA Optimizer
 
