@@ -7,7 +7,7 @@ through Base.metadata.
 from app.core.database import Base
 from app.models.catalog import BatchRecord, OptimizationJob, Supplier
 from app.models.chat import ChatMessage, ChatSession
-from app.models.compliance import BpomLimit
+from app.models.compliance import BpomLimit, ProhibitedSubstance
 from app.models.knowledge import KnowledgeChunk
 from app.models.formula import Formula, FormulaIngredient, FormulaVersion
 from app.models.ingredient import Ingredient
@@ -28,6 +28,7 @@ __all__ = [
     "Ingredient",
     "KnowledgeChunk",
     "OptimizationJob",
+    "ProhibitedSubstance",
     "Project",
     "RefreshToken",
     "SimulationRun",

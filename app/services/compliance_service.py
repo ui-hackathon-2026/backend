@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.exceptions import DatabaseUnavailableError
 from app.core.llm import GroqGateway, get_groq_gateway
-from app.models.compliance import BpomLimit
+from app.models.compliance import BpomLimit, ProhibitedSubstance
 from app.models.ingredient import Ingredient
 from app.models.knowledge import KnowledgeChunk
 from app.schemas.compliance import (
@@ -52,14 +52,43 @@ def tokens(text: str) -> set[str]:
     return {t for t in re.split(r"[^a-z0-9]+", text.lower()) if len(t) > 2}
 
 
+def blocklist_head(name: str) -> str:
+    cleaned = " ".join(name.split()).lower()
+    cleaned = re.sub(r"\s+dan (garamnya|garam-garamnya|sediaannya|senyawanya)\s*$", "", cleaned)
+    cleaned = re.split(r",?\s+bila\s+|\s+kecuali\s+", cleaned)[0]
+    return cleaned.strip()
+
+
+def blocklist_aliases(name: str) -> set[str]:
+    found = {blocklist_head(name)}
+    for group in re.findall(r"\(([A-Za-z][A-Za-z0-9\- ]{2,})\)", name):
+        cleaned = group.strip().lower()
+        if cleaned not in ("inci", "iso", "ci"):
+            found.add(cleaned)
+    return found
+
+
+def xref_group(tag: str) -> str | None:
+    if not tag.startswith("cross-ref-"):
+        return None
+    return re.sub(r"-\d+$", "", tag)
+
+
 def load_reference(db: Session):
     try:
         limits = {row.inci: row for row in db.query(BpomLimit).all()}
         catalog = {row.inci: row for row in db.query(Ingredient).all()}
         chunks = db.query(KnowledgeChunk).all()
+        blocked = set()
+        for row in db.query(ProhibitedSubstance).all():
+            blocked |= blocklist_aliases(row.name)
     except Exception as exc:
         raise DatabaseUnavailableError(str(exc)) from exc
-    return limits, catalog, chunks
+    return limits, catalog, chunks, blocked
+
+
+def clean_names(*values) -> list[str]:
+    return [v for v in values if isinstance(v, str) and v.strip()]
 
 
 def normalize_inci(raw: str, catalog: dict, chunks: list) -> str | None:
@@ -71,7 +100,9 @@ def normalize_inci(raw: str, catalog: dict, chunks: list) -> str | None:
         if lowered in [s.lower() for s in (row.synonyms or [])]:
             return inci
     for chunk in chunks:
-        names = [chunk.inci_name, chunk.substance_name] + list(chunk.synonyms or [])
+        names = clean_names(
+            chunk.inci_name, chunk.substance_name, *(chunk.synonyms or [])
+        )
         if lowered in [n.lower() for n in names]:
             if chunk.inci_name in catalog:
                 return chunk.inci_name
@@ -81,15 +112,14 @@ def normalize_inci(raw: str, catalog: dict, chunks: list) -> str | None:
 
 def score_chunk(chunk: KnowledgeChunk, query_tokens: set[str]) -> int:
     haystack = " ".join(
-        [
+        clean_names(
             chunk.title,
             chunk.substance_name,
             chunk.inci_name,
-            " ".join(chunk.synonyms or []),
             chunk.category,
-            " ".join(chunk.tags or []),
             chunk.raw_text,
-        ]
+        )
+        + [" ".join(chunk.synonyms or []), " ".join(chunk.tags or [])]
     )
     return len(tokens(haystack) & query_tokens)
 
@@ -98,7 +128,21 @@ def retrieve(chunks: list, text: str, top_k: int = 3):
     scored = [(score_chunk(c, tokens(text)), c) for c in chunks]
     scored = [(s, c) for s, c in scored if s > 0]
     scored.sort(key=lambda pair: pair[0], reverse=True)
-    return [c for _, c in scored[:top_k]]
+    hits = [c for _, c in scored[:top_k]]
+    groups = {
+        xref_group(tag)
+        for _, c in scored[:top_k]
+        for tag in (c.tags or [])
+        if xref_group(tag)
+    }
+    if groups:
+        seen = {c.id for c in hits}
+        for c in chunks:
+            own = {xref_group(t) for t in (c.tags or []) if xref_group(t)}
+            if c.id not in seen and groups & own:
+                hits.append(c)
+                seen.add(c.id)
+    return hits
 
 
 def citation_of(chunk: KnowledgeChunk | None) -> RagCitation | None:
@@ -117,7 +161,7 @@ def audit_compliance(
     body: ComplianceAuditRequest,
     gateway: GroqGateway | None = None,
 ) -> ComplianceAuditResponse:
-    limits, catalog, chunks = load_reference(db)
+    limits, catalog, chunks, blocked = load_reference(db)
     audits: list[IngredientAudit] = []
     violations = 0
     unverified: list[str] = []
@@ -131,10 +175,14 @@ def audit_compliance(
         if canonical:
             hits = retrieve(chunks, f"{canonical} {item.name}", top_k=1)
             chunk = hits[0] if hits else None
+        banned = blocklist_head(item.inci) in blocked or (
+            canonical is not None
+            and blocklist_head(canonical) in blocked
+        )
         over_limit = (
             limit is not None and item.weight_pct > limit.max_pct
         )
-        if over_limit:
+        if banned or over_limit:
             violations += 1
         if known is None:
             unverified.append(item.inci)
@@ -146,7 +194,9 @@ def audit_compliance(
                 non_halal.append(item.inci)
             tkdn = known.tkdn_pct or 0.0
             tkdn_weighted += item.weight_pct * tkdn
-        if over_limit:
+        if banned:
+            notes = "Bahan dilarang dalam kosmetika (Lampiran V)."
+        elif over_limit:
             notes = (
                 f"Konsentrasi {item.weight_pct}% melebihi batas "
                 f"{limit.max_pct}%."
@@ -166,7 +216,7 @@ def audit_compliance(
                 weight_pct=item.weight_pct,
                 phase=item.phase,
                 role=item.role,
-                status="FAILED" if over_limit or halal == "FAILED" else "PASSED",
+                status="FAILED" if banned or over_limit or halal == "FAILED" else "PASSED",
                 bpom_limit_pct=limit.max_pct if limit else None,
                 halal_status=halal,
                 tkdn_pct=tkdn,
@@ -184,7 +234,7 @@ def audit_compliance(
     overall = "COMPLIANT" if violations == 0 and not non_halal else "NON_COMPLIANT"
     tkdn_score = round(tkdn_weighted / 100.0, 1)
     verdict = (
-        f"Formula {overall_status_word(overall)} terhadap Perka BPOM No. 17/2022 "
+        f"Formula {overall_status_word(overall)} terhadap Perka BPOM No. 25/2025 "
         f"dan standar Halal HAS 23000. Skor TKDN {tkdn_score}% "
         f"({'memenuhi' if tkdn_score >= TKDN_THRESHOLD_PCT else 'belum memenuhi'} "
         f"target nasional 40%)."
@@ -275,7 +325,7 @@ def ask_rag(
 ) -> AskRagResponse:
     import json as jsonlib
 
-    _, _, chunks = load_reference(db)
+    _, _, chunks, _ = load_reference(db)
     query_text = body.query + " " + (body.category_context or "")
     hits = retrieve(chunks, query_text, top_k=3)
     excerpts = "\n".join(

@@ -144,3 +144,48 @@ def test_ask_rag(client, db_session, monkeypatch):
     assert "Alpha-Arbutin" in body["answer"]
     assert body["citations"][0]["document"] == "Peraturan BPOM No. 17 Tahun 2022"
     assert body["confidence_score"] == 0.9
+
+
+def test_prohibited_substance_blocked(client, db_session, monkeypatch):
+    from app.models.compliance import ProhibitedSubstance
+
+    seed(db_session)
+    db_session.add(
+        ProhibitedSubstance(name="Hydroquinone dan garamnya", cas_number="123-31-9", entry_no="384")
+    )
+    db_session.commit()
+    body = audit(client, [("Hydroquinone", 1.0), ("Aqua", 99.0)], monkeypatch).json()
+    assert body["overall_status"] == "NON_COMPLIANT"
+    hydro = [a for a in body["ingredients_audit"] if a["inci"] == "Hydroquinone"][0]
+    assert hydro["status"] == "FAILED"
+    assert "dilarang" in hydro["audit_notes"]
+
+
+def test_hydroquinone_cross_reference(client, db_session):
+    from app.models.knowledge import KnowledgeChunk
+    from app.services.compliance_service import retrieve
+
+    seed(db_session)
+    db_session.add(
+        KnowledgeChunk(
+            id="lamp1_hq", title="Hydroquinone nail", regulation="BPOM 25/2025",
+            appendix="Lampiran I", clause_entry="No. 59", category="restricted",
+            substance_name="Hydroquinone", inci_name="Hydroquinone",
+            tags=["cross-ref-lampiran-1"],
+            raw_text="Hydroquinone 0.02% nail only.",
+        )
+    )
+    db_session.add(
+        KnowledgeChunk(
+            id="lamp5_hq", title="Hydroquinone ban", regulation="BPOM 25/2025",
+            appendix="Lampiran V", clause_entry="No. 384", category="prohibited",
+            substance_name="Hydroquinone", inci_name="Hydroquinone",
+            tags=["cross-ref-lampiran-5"],
+            raw_text="Hydroquinone prohibited in general cosmetics.",
+        )
+    )
+    db_session.commit()
+    chunks = db_session.query(KnowledgeChunk).all()
+    hits = retrieve(chunks, "hydroquinone skin lightening", top_k=1)
+    ids = {c.id for c in hits}
+    assert ids == {"lamp1_hq", "lamp5_hq"}

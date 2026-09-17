@@ -110,7 +110,9 @@ guard (BPOM limits, halal, TKDN) grounded by keyword retrieval over the
 reasoning for toxicology narrative and label warnings with a
 deterministic fallback when the engine is down. `POST
 /api/v1/compliance/ask-rag` answers regulatory questions with citations
-from the same chunks.
+from the same chunks. Knowledge base: 118 chunks under Perka BPOM No.
+25/2025 plus a 1700-entry prohibited-substance blocklist checked first
+on every audit.
 
 ## Projects & Briefs
 
@@ -135,7 +137,8 @@ never a dropped connection.
 simplex honoring locked ingredients, scores every trial in one
 vectorized surrogate batch, and returns Top-3 plus 3D scatter points.
 `POST /api/v1/batch-sheet/generate` converts a formula to exact gram
-weights with SOP steps. `POST /api/v1/similarity/check` compares
+weights with SOP steps. `GET /api/v1/batch-sheet/download/{id}`
+returns the printable PDF batch record. `POST /api/v1/similarity/check` compares
 Jaccard, cosine, and phase-chassis overlap against stored formulas.
 `GET /api/v1/suppliers` reads the supplier catalog. Patent FTO and 3D
 conformers honestly answer 503 until their engines connect.
