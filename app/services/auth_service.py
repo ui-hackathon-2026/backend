@@ -45,6 +45,7 @@ def build_user(user: User) -> AuthUser:
         email=user.email,
         role=user.role,
         avatarInitials=avatar_initials(user.name),
+        createdAt=user.created_at,
     )
 
 

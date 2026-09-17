@@ -57,6 +57,7 @@ def test_login_ok_and_me(client):
     )
     assert me.status_code == 200
     assert me.json()["email"] == "andi@example.com"
+    assert "createdAt" in me.json()
 
 
 def test_login_wrong_credentials(client):

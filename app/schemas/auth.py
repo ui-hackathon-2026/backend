@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import re
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -45,6 +47,7 @@ class AuthUser(BaseModel):
     email: str
     role: str
     avatar_initials: str = Field(alias="avatarInitials")
+    created_at: datetime = Field(alias="createdAt")
 
 
 class AuthSession(BaseModel):
