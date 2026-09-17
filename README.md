@@ -107,6 +107,16 @@ text) or `enhance` mode (reference formula + instruction, ref required).
 `POST /api/v1/uploads/brief` ingests a marketing PDF (max 10 MB) and
 returns extracted text with a preview. Order of use is never enforced.
 
+## Copilot
+
+`POST /api/v1/copilot/chat` accepts a message plus optional session,
+project, canvas snapshot, and brief reference. It streams
+`text/event-stream` events: session meta, per-agent progress steps
+(architect, auditor, sentinel, synthesizer), reply tokens, and a final
+result carrying the parsed formulation spec. Sessions and messages
+persist for multi-turn context. LLM outage yields an error event,
+never a dropped connection.
+
 ## Test
 
 ```bash

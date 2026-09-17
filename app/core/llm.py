@@ -16,6 +16,8 @@ import httpx
 from app.core.config import settings
 from app.core.exceptions import LLMUnavailableError
 
+JSON_RETRYABLE_CODE = "json_validate_failed"
+
 def load_groq_keys() -> list[str]:
     candidates = [os.environ.get("GROQ_API_KEY", "")]
     candidates += [os.environ.get(f"GROQ_API_KEY_{i}", "") for i in range(1, 21)]
@@ -105,12 +107,69 @@ class GroqGateway:
             if response.status_code in (401, 429):
                 self._cool(index)
                 continue
+            if response.status_code == 400 and JSON_RETRYABLE_CODE in response.text:
+                self._cool(index)
+                continue
             if 500 <= response.status_code < 600:
                 self._cool(index)
                 continue
             raise LLMUnavailableError(
                 f"groq request rejected with status {response.status_code}"
             )
+        raise LLMUnavailableError("all groq keys cooling down or unreachable")
+
+    def chat_stream(
+        self,
+        messages: list[dict],
+        model: str | None = None,
+        max_tokens: int = 1024,
+    ):
+        attempts = 0
+        while attempts < len(self._keys):
+            index = self._pick()
+            if index is None:
+                break
+            attempts += 1
+            try:
+                stream = self._client.stream(
+                    "POST",
+                    "/chat/completions",
+                    headers={"Authorization": f"Bearer {self._keys[index]}"},
+                    json={
+                        "model": model or settings.groq_model_agent,
+                        "messages": messages,
+                        "max_tokens": max_tokens,
+                        "stream": True,
+                    },
+                )
+            except httpx.HTTPError:
+                self._cool(index)
+                continue
+            with stream as response:
+                if response.status_code != 200:
+                    if response.status_code in (401, 429) or (
+                        500 <= response.status_code < 600
+                    ):
+                        self._cool(index)
+                        continue
+                    raise LLMUnavailableError(
+                        f"groq request rejected with status {response.status_code}"
+                    )
+                for line in response.iter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[len("data:"):].strip()
+                    if data == "[DONE]":
+                        return
+                    try:
+                        delta = json.loads(data)["choices"][0]["delta"].get(
+                            "content"
+                        )
+                    except (KeyError, IndexError, ValueError):
+                        continue
+                    if delta:
+                        yield delta
+                return
         raise LLMUnavailableError("all groq keys cooling down or unreachable")
 
 _gateway: GroqGateway | None = None
