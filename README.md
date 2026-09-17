@@ -145,7 +145,8 @@ Jaccard, cosine, and phase-chassis overlap against stored formulas.
 `POST /api/v1/similarity/external` scores novelty against 552
 competitor products with label-order pseudo-weights (estimates, never
 lab percentages) plus synonym normalization.
-`GET /api/v1/suppliers` reads the supplier catalog.
+`GET /api/v1/suppliers` reads the supplier catalog (city, MOQ,
+ pricing, synthetic flag).
 `POST /api/v1/molecules/conformer-3d` returns RDKit MMFF94-minimized
 PDB structures with MW, LogP, and TPSA, resolving botanical extracts
 to marker compounds. Patent FTO honestly answers 503 until its engine

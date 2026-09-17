@@ -171,10 +171,32 @@ def test_conformer_invalid_smiles(client):
     assert r.status_code == 422
 
 
-def test_suppliers_empty_list(client):
-    r = client.get("/api/v1/suppliers")
-    assert r.status_code == 200
-    assert r.json() == []
+def test_suppliers_list_and_filter(client, db_session):
+    from app.models.catalog import Supplier
+
+    db_session.add(
+        Supplier(
+            name="PT Aqua Nusa Demo", ingredient_inci="Aqua", grade="Technical",
+            halal_certified=True, lead_time_days=7, price_per_kg_idr=5000,
+            notes="DEMO DATA",
+        )
+    )
+    db_session.add(
+        Supplier(
+            name="PT Vita Aktif Demo", ingredient_inci="Niacinamide", grade="USP",
+            halal_certified=True, lead_time_days=21, price_per_kg_idr=700000,
+            notes="DEMO DATA",
+        )
+    )
+    db_session.commit()
+    body = client.get("/api/v1/suppliers").json()
+    assert len(body) == 2
+    assert body[0]["halal_certified"] is True
+    assert "is_synthetic" in body[0]
+    assert "city" in body[0]
+    filtered = client.get("/api/v1/suppliers?inci=Aqua").json()
+    assert len(filtered) == 1
+    assert filtered[0]["ingredient_inci"] == "Aqua"
 
 
 def test_normalize_synonyms():

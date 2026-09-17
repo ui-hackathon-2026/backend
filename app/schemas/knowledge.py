@@ -58,5 +58,9 @@ class SupplierResponse(BaseModel):
     halal_certified: bool = False
     lead_time_days: int | None = None
     price_per_kg_idr: float | None = None
+    city: str | None = None
+    province: str | None = None
+    moq_kg: float | None = None
+    is_synthetic: bool = False
 
     model_config = {"from_attributes": True}
