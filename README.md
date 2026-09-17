@@ -95,10 +95,13 @@ update (`GET /api/v1/formulas/{id}/versions`).
 
 ## Compliance
 
-`POST /api/v1/compliance/audit` runs deterministic BPOM, halal, and
-TKDN checks with no ML involved. BPOM limits live in `bpom_limits`,
-halal and TKDN data in the `ingredients` catalog. Unknown ingredients
-are reported as unverified, never guessed.
+`POST /api/v1/compliance/audit` runs the hybrid Tier 1 deterministic
+guard (BPOM limits, halal, TKDN) grounded by keyword retrieval over the
+`knowledge_chunks` table with INCI synonym resolution, then Tier 3 LLM
+reasoning for toxicology narrative and label warnings with a
+deterministic fallback when the engine is down. `POST
+/api/v1/compliance/ask-rag` answers regulatory questions with citations
+from the same chunks.
 
 ## Projects & Briefs
 
