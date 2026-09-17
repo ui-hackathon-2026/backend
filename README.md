@@ -165,6 +165,9 @@ yield 422 with best-achieved suggestions. Expect ~20s at 50000 trials
 COGS, TKDN, radar metrics, and warnings purely from request numbers.
 `POST /api/v1/workbench/formulas` saves a flat-ingredient draft into
 the canonical formula storage. Weights must sum 100% ± 1%.
+`GET /api/v1/ingredients/search` finds catalog entries by name, INCI,
+synonym, or Indonesian function keywords with phase, halal, and TKDN
+filters.
 
 ## Orchestrator
 

@@ -8,6 +8,7 @@ from app.api.v1 import (
     db,
     formulas,
     health,
+    ingredients,
     knowledge,
     nsga,
     optimize,
@@ -19,6 +20,7 @@ from app.api.v1 import (
 
 api_router = APIRouter()
 api_router.include_router(health.router)
+api_router.include_router(ingredients.router)
 api_router.include_router(db.router)
 api_router.include_router(auth.router)
 api_router.include_router(simulate.router)
