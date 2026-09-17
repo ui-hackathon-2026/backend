@@ -142,6 +142,9 @@ vectorized surrogate batch, and returns Top-3 plus 3D scatter points.
 weights with SOP steps. `GET /api/v1/batch-sheet/download/{id}`
 returns the printable PDF batch record. `POST /api/v1/similarity/check` compares
 Jaccard, cosine, and phase-chassis overlap against stored formulas.
+`POST /api/v1/similarity/external` scores novelty against 552
+competitor products with label-order pseudo-weights (estimates, never
+lab percentages) plus synonym normalization.
 `GET /api/v1/suppliers` reads the supplier catalog.
 `POST /api/v1/molecules/conformer-3d` returns RDKit MMFF94-minimized
 PDB structures with MW, LogP, and TPSA, resolving botanical extracts

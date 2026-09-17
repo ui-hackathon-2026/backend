@@ -4,11 +4,14 @@ from app.api.deps import SessionDep
 from app.models.catalog import Supplier
 from app.schemas.knowledge import (
     ConformerRequest,
+    ExternalSimilarityRequest,
+    ExternalSimilarityResponse,
     FtoRequest,
     SimilarityRequest,
     SimilarityResponse,
     SupplierResponse,
 )
+from app.services.external_service import check_external
 from app.services.molecules_service import ConformerError, conformer
 from app.services.similarity_service import check_similarity
 
@@ -18,6 +21,11 @@ router = APIRouter(tags=["knowledge"])
 @router.post("/similarity/check", response_model=SimilarityResponse)
 def similarity(body: SimilarityRequest, db: SessionDep) -> SimilarityResponse:
     return check_similarity(db, body)
+
+
+@router.post("/similarity/external", response_model=ExternalSimilarityResponse)
+def external(body: ExternalSimilarityRequest, db: SessionDep) -> ExternalSimilarityResponse:
+    return check_external(db, body)
 
 
 @router.post("/patents/fto-check", status_code=503)

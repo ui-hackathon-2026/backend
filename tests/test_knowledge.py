@@ -154,3 +154,50 @@ def test_suppliers_empty_list(client):
     r = client.get("/api/v1/suppliers")
     assert r.status_code == 200
     assert r.json() == []
+
+
+def test_normalize_synonyms():
+    from app.services.external_service import normalize_name
+
+    assert normalize_name("Water") == "aqua"
+    assert normalize_name("Eau") == "aqua"
+    assert normalize_name("Parfum") == "fragrance"
+
+
+def test_external_novelty(client, db_session):
+    from app.models.competitor import CompetitorProduct
+
+    db_session.add(
+        CompetitorProduct(
+            brand="Wardah", slug="wardah-test-gel", name="Wardah Test Gel",
+            url="https://example.test/wardah",
+            inci_list=["Aqua", "Niacinamide", "Glycerin", "Phenoxyethanol"],
+            ingredient_count=4,
+        )
+    )
+    db_session.add(
+        CompetitorProduct(
+            brand="Emina", slug="emina-test-lotion", name="Emina Test Lotion",
+            url="https://example.test/emina",
+            inci_list=["Aqua", "Glycerin", "Niacinamide", "Dimethicone", "Carbomer", "Phenoxyethanol"],
+            ingredient_count=6,
+        )
+    )
+    db_session.commit()
+    r = client.post(
+        "/api/v1/similarity/external",
+        json={
+            "ingredients": [
+                {"inci": "Aqua", "weight_pct": 80.0},
+                {"inci": "Niacinamide", "weight_pct": 10.0},
+                {"inci": "Glycerin", "weight_pct": 10.0},
+            ]
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert 0.0 <= body["novelty_score"] <= 1.0
+    assert "pseudo-weight" in body["estimated_basis"]
+    assert len(body["top_matches"]) == 1
+    assert body["top_matches"][0]["brand"] == "Emina"
+    assert "aqua" in body["top_matches"][0]["shared_ingredients"]

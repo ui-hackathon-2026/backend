@@ -22,6 +22,24 @@ class SimilarityResponse(BaseModel):
     matches: list[SimilarityMatch]
 
 
+class ExternalSimilarityRequest(BaseModel):
+    ingredients: list[SimilarityIngredient] = Field(min_length=1)
+
+
+class ExternalMatch(BaseModel):
+    brand: str
+    product_name: str
+    url: str
+    similarity: float
+    shared_ingredients: list[str] = Field(default_factory=list)
+
+
+class ExternalSimilarityResponse(BaseModel):
+    novelty_score: float
+    estimated_basis: str
+    top_matches: list[ExternalMatch] = Field(default_factory=list)
+
+
 class FtoRequest(BaseModel):
     ingredients: list[SimilarityIngredient] = Field(min_length=1)
 
