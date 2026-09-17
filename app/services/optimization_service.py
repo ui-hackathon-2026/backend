@@ -55,18 +55,30 @@ def catalog_maps(db: Session) -> tuple[dict, dict, set[str]]:
 
 
 def sample_recipe(
-    rng: random.Random, locked: dict[str, float], pool: list[str]
+    rng: random.Random,
+    locked: dict[str, float],
+    pool: list[str],
+    cost: dict | None = None,
 ) -> dict[str, float]:
     locked_total = sum(locked.values())
     if locked_total >= 100.0:
         raise FormulaWeightError("locked ingredients already reach 100%")
-    draws = [rng.random() + 0.05 for _ in pool]
-    free_total = 100.0 - locked_total
     recipe = dict(locked)
-    for inci, draw in zip(pool, draws):
+    free_total = 100.0 - locked_total
+    rest = list(pool)
+    if "Aqua" in rest:
+        aqua_share = round(min(rng.uniform(55.0, 85.0), free_total * 0.92), 2)
+        recipe["Aqua"] = aqua_share
+        free_total = round(100.0 - sum(recipe.values()), 2)
+        rest = [inci for inci in rest if inci != "Aqua"]
+    draws = []
+    for inci in rest:
+        price = (cost or {}).get(inci, 0.0)
+        draws.append((rng.random() + 0.05) / (1.0 + price / 100000.0))
+    for inci, draw in zip(rest, draws):
         recipe[inci] = round(draw / sum(draws) * free_total, 2)
     diff = round(100.0 - sum(recipe.values()), 2)
-    recipe[pool[-1]] = round(recipe[pool[-1]] + diff, 2)
+    recipe[rest[-1]] = round(recipe[rest[-1]] + diff, 2)
     return recipe
 
 
@@ -108,7 +120,8 @@ def assemble_trial(recipe, metrics, cost, tkdn, objectives) -> dict:
 
 
 def run_optimization(
-    db: Session, body: OptimizeRequest, seed: int | None = None
+    db: Session, body: OptimizeRequest, seed: int | None = None,
+    max_cogs: float | None = None,
 ) -> OptimizeResponse:
     from app.ml.predictor import get_lightgbm_predictor
 
@@ -121,7 +134,7 @@ def run_optimization(
     locked = {i.inci: i.pct for i in body.locked_ingredients}
     pool = [inci for inci, _, _, _ in POOL if inci not in locked]
     started = time.perf_counter()
-    recipes = [sample_recipe(rng, locked, pool) for _ in range(body.num_trials)]
+    recipes = [sample_recipe(rng, locked, pool, cost) for _ in range(body.num_trials)]
     batch = [recipe_features(db, recipe, known) for recipe in recipes]
     try:
         metrics_list = predictor.predict_many(batch)
@@ -133,7 +146,9 @@ def run_optimization(
         for recipe, metrics in zip(recipes, metrics_list)
     ]
     duration = time.perf_counter() - started
-    by_stability = sorted(trials, key=lambda t: t["stability"], reverse=True)
+    eligible = [t for t in trials if max_cogs is None or t["cogs"] <= max_cogs]
+    ranked = eligible if eligible else trials
+    by_stability = sorted(ranked, key=lambda t: t["stability"], reverse=True)
     by_composite = sorted(trials, key=lambda t: t["composite"], reverse=True)
     by_tkdn = sorted(trials, key=lambda t: t["tkdn"], reverse=True)
     top = [

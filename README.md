@@ -140,6 +140,15 @@ COGS, TKDN, radar metrics, and warnings purely from request numbers.
 `POST /api/v1/workbench/formulas` saves a flat-ingredient draft into
 the canonical formula storage. Weights must sum 100% ± 1%.
 
+## Orchestrator
+
+`POST /api/v1/orchestrator/synthesize` turns target params into a
+4-phase blueprint reusing the optimizer, catalog phases, and LLM
+rationale. `POST /api/v1/orchestrator/parse-brief-pdf` extracts
+structured brief data from a marketing PDF. `GET
+/api/v1/orchestrator/chassis` serves curated brand templates,
+`GET /api/v1/orchestrator/hero-ingredients` lists TKDN botanicals.
+
 ## Test
 
 ```bash

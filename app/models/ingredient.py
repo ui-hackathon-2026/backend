@@ -24,3 +24,4 @@ class Ingredient(Base):
     bpom_limit_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
     halal_status: Mapped[str] = mapped_column(String(32), default="HALAL")
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    origin: Mapped[str | None] = mapped_column(String(255), nullable=True)
