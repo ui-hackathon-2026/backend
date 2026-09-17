@@ -92,13 +92,18 @@ def describe(mol: Chem.Mol, display_name: str, marker_name: str | None) -> dict:
         "atoms": atoms,
         "bonds": bonds,
         "molecular_weight": round(Descriptors.MolWt(mol), 2),
+        "molecular_formula": Descriptors.rdMolDescriptors.CalcMolFormula(mol),
         "logP": round(Descriptors.MolLogP(mol), 2),
         "tpsa": round(Descriptors.TPSA(mol), 2),
+        "h_bond_donors": Descriptors.NumHDonors(mol),
+        "h_bond_acceptors": Descriptors.NumHAcceptors(mol),
+        "rotatable_bonds": Descriptors.NumRotatableBonds(mol),
+        "charge": 0,
         "minimized_energy_kcal_mol": minimized_energy(mol),
     }
 
 
-def conformer(smiles: str, name: str | None) -> dict:
+def conformer(smiles: str | None, name: str | None) -> dict:
     marker = resolve_marker(name)
     if marker is not None:
         marker_name, marker_smiles = marker
@@ -106,5 +111,7 @@ def conformer(smiles: str, name: str | None) -> dict:
             return describe(embed(marker_smiles), marker_name, marker_name)
         except ConformerError:
             pass
+    if not smiles:
+        raise ConformerError("smiles required when no marker matches")
     mol = embed(smiles)
     return describe(mol, name or smiles, None)

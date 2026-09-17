@@ -45,7 +45,7 @@ class FtoRequest(BaseModel):
 
 
 class ConformerRequest(BaseModel):
-    smiles: str = Field(min_length=1, max_length=1024)
+    smiles: str | None = Field(default=None, max_length=1024)
     name: str | None = Field(default=None, max_length=255)
     energy_minimize: bool = True
 
