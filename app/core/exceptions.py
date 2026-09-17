@@ -11,3 +11,11 @@ class FormulaWeightError(ValueError):
 
     Mapped to HTTP 400 by an exception handler in app.main.
     """
+
+
+class LLMUnavailableError(RuntimeError):
+    """Raised when every LLM key is rate limited, invalid, or unreachable.
+
+    Mapped to HTTP 503 by an exception handler in app.main.
+    Key material is never included in the message.
+    """

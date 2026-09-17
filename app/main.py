@@ -8,7 +8,11 @@ from fastapi.responses import JSONResponse
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.database import engine
-from app.core.exceptions import DatabaseUnavailableError, FormulaWeightError
+from app.core.exceptions import (
+    DatabaseUnavailableError,
+    FormulaWeightError,
+    LLMUnavailableError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +50,11 @@ def create_app() -> FastAPI:
     @app.exception_handler(FormulaWeightError)
     async def formula_weight_handler(request: Request, exc: FormulaWeightError):
         return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+    @app.exception_handler(LLMUnavailableError)
+    async def llm_unavailable_handler(request: Request, exc: LLMUnavailableError):
+        logger.error("llm unavailable: %s", exc)
+        return JSONResponse(status_code=503, content={"detail": "ai engine unavailable"})
 
     app.include_router(api_router, prefix="/api/v1")
 
