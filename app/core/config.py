@@ -10,5 +10,20 @@ class Settings(BaseSettings):
 
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
 
+    log_level: str = "INFO"
+
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
+    db_pool_recycle: int = 300
+    db_pool_timeout: int = 30
+
+    database_url: str = "postgresql+psycopg://user:password@localhost:5432/hackathon"
+
+    @property
+    def sqlalchemy_url(self) -> str:
+        if self.database_url.startswith("postgresql://"):
+            return self.database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+        return self.database_url
+
 
 settings = Settings()
