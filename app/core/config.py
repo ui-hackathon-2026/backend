@@ -12,6 +12,9 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
+    secret_key: str = "dev-only-change-me"
+    access_token_expire_minutes: int = 60 * 24 * 7
+
     db_pool_size: int = 5
     db_max_overflow: int = 10
     db_pool_recycle: int = 300

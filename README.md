@@ -6,7 +6,7 @@
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # then fill in DATABASE_URL
+cp .env.example .env
 ```
 
 ## Run
@@ -19,6 +19,27 @@ uvicorn app.main:app --reload --port 8000
 - Docs: http://localhost:8000/docs
 - Health: http://localhost:8000/api/v1/health
 - DB health: http://localhost:8000/api/v1/db-health
+
+## Auth
+
+Simple username + password accounts, no roles yet.
+
+```bash
+curl -X POST localhost:8000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username": "rina", "password": "secret123"}'
+
+curl -X POST localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "rina", "password": "secret123"}'
+
+curl localhost:8000/api/v1/auth/me \
+  -H "Authorization: Bearer <access_token>"
+```
+
+Rules: username unique (3-50 chars), password min 6 chars, Argon2
+hashing, JWT Bearer valid 7 days. Protect any route with
+`CurrentUserDep` from `app.api.deps`.
 
 ## Layout
 
