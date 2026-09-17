@@ -100,6 +100,13 @@ TKDN checks with no ML involved. BPOM limits live in `bpom_limits`,
 halal and TKDN data in the `ingredients` catalog. Unknown ingredients
 are reported as unverified, never guessed.
 
+## Projects & Briefs
+
+`POST /api/v1/projects` opens a loose workspace in `new` mode (prompt
+text) or `enhance` mode (reference formula + instruction, ref required).
+`POST /api/v1/uploads/brief` ingests a marketing PDF (max 10 MB) and
+returns extracted text with a preview. Order of use is never enforced.
+
 ## Test
 
 ```bash
