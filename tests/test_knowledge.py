@@ -63,10 +63,31 @@ def test_batch_generate_grams(client):
     assert grams["Caprylic/Capric Triglyceride"] == 40.0
     assert grams["Aqua"] == 415.0
     assert sum(grams.values()) == 500.0
+    assert len(body["shap_contributions"]) == len(body["scaled_ingredients"]) + 1
+    assert all(
+        set(entry) == {"label", "shap_value"} for entry in body["shap_contributions"]
+    )
     assert client.post(
         "/api/v1/batch-sheet/generate",
         json={"formula_id": "form_nope", "batch_size_grams": 500.0},
     ).status_code == 404
+
+
+def test_shap_additivity():
+    from app.ml.predictor import get_lightgbm_predictor
+    from app.ml.shap_explainer import explain_stability
+
+    features = {
+        "oil_pct": 8.0, "emulsifier_pct": 4.5, "thickener_pct": 0.0,
+        "solvent_pct": 83.0, "humectant_pct": 3.5, "active_pct": 1.0,
+        "preservative_pct": 0.0, "ingredient_count": 6,
+        "temperature_c": 40.0, "duration_days": 90,
+        "delta_hlb": 3.5, "sor": 0.562, "unknown_incis": [],
+    }
+    explained = explain_stability(features)
+    predicted = get_lightgbm_predictor().predict(features)["stability_score"]
+    assert explained
+    assert 0.0 <= predicted <= 1.0
 
 
 def test_batch_download_pdf(client):

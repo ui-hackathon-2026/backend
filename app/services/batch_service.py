@@ -64,10 +64,60 @@ def generate_batch(db: Session, body: BatchGenerateRequest) -> BatchResponse | N
         batch_size_grams=body.batch_size_grams,
         operator_name=body.operator_name,
         scaled_ingredients=scaled,
-        shap_contributions=[],
+        shap_contributions=explain_batch(db, formula),
         sop_steps=sop_steps(body.batch_size_grams),
         created_at=record.created_at,
     )
+
+
+ROLE_FEATURES = {
+    "emulsifier": "emulsifier_pct",
+    "humectant": "humectant_pct",
+    "thickener": "thickener_pct",
+    "active": "active_pct",
+    "preservative": "preservative_pct",
+    "solvent": "water_phase_pct",
+}
+
+
+def explain_batch(db: Session, formula: Formula) -> list[dict]:
+    from app.ml.shap_explainer import attribute_to_ingredients, explain_stability
+    from app.models.ingredient import Ingredient
+    from app.schemas.simulation import IngredientInput, SimulationRequest
+    from app.services.simulation_service import extract_features
+
+    try:
+        catalog = {row.inci: row for row in db.query(Ingredient).all()}
+        known = set(catalog)
+        ingredients = []
+        for item in formula.ingredients:
+            row = catalog.get(item.inci)
+            role = row.default_role if row else "active"
+            ingredients.append(
+                IngredientInput(
+                    name=item.name or item.inci,
+                    inci=item.inci,
+                    smiles=item.smiles or "O",
+                    weight_pct=item.weight_pct,
+                    phase=item.phase,
+                    role=role,
+                    hlb=row.hlb if row else None,
+                )
+            )
+        request = SimulationRequest(formula_name=formula.name, ingredients=ingredients)
+        features = extract_features(db, request, known_incis=known)
+        buckets: dict[str, list[tuple[str, float]]] = {}
+        for item in formula.ingredients:
+            row = catalog.get(item.inci)
+            role = row.default_role if row else "active"
+            if item.phase == "A":
+                bucket = "oil_phase_pct"
+            else:
+                bucket = ROLE_FEATURES.get(role, "active_pct")
+            buckets.setdefault(bucket, []).append((item.inci, item.weight_pct))
+        return attribute_to_ingredients(explain_stability(features), buckets)
+    except Exception:
+        return []
 
 
 def get_batch_record(db: Session, record_id: str) -> BatchRecord | None:
