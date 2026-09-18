@@ -131,6 +131,9 @@ def test_password_is_hashed_not_plaintext():
 
 
 def test_protected_routes_reject_anonymous(client):
-    assert client.get("/api/v1/formulas").status_code == 401
-    assert client.post("/api/v1/simulate/stability", json={}).status_code in (401, 422)
+    # formulas/simulate/optimize/nsga are intentionally public (library
+    # browsing, anonymous simulation) per app/api/v1/router.py.
+    assert client.get("/api/v1/ingredients/search?q=aqua").status_code == 401
+    assert client.get("/api/v1/projects").status_code == 401
+    assert client.get("/api/v1/formulas").status_code == 200
     assert client.get("/api/v1/health").status_code == 200
