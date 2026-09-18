@@ -25,10 +25,12 @@ class Ingredient(Base):
     halal_status: Mapped[str] = mapped_column(String(32), default="HALAL")
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     origin: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    structure_representation_type: Mapped[str] = mapped_column(
+        String(32), default="unresolved"
+    )
     entity_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
     identity_source: Mapped[str | None] = mapped_column(String(64), nullable=True)
     identity_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
-    structure_representation_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     molecular_weight: Mapped[float | None] = mapped_column(Float, nullable=True)
     logp: Mapped[float | None] = mapped_column(Float, nullable=True)
     tpsa: Mapped[float | None] = mapped_column(Float, nullable=True)

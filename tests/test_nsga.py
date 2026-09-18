@@ -23,9 +23,9 @@ def test_pareto_mask_correctness():
     assert 0.0 <= hypervolume(stability, cogs, tkdn, viscdev, optimal) <= 1.0
 
 
-def test_run_nsga2_shape(client, db_session, monkeypatch):
+def test_run_nsga2_shape(authed_client, db_session, monkeypatch):
     monkeypatch.setattr(nsga_service, "get_groq_gateway", lambda: FakeGateway())
-    r = client.post(
+    r = authed_client.post(
         "/api/v1/optimizer/run-nsga2?seed=5",
         json={
             "weights": {"stabilityWeight": 35, "cogsWeight": 30, "tkdnWeight": 20, "viscosityWeight": 15},
@@ -51,9 +51,9 @@ def test_run_nsga2_shape(client, db_session, monkeypatch):
     assert abs(sum(i["weightPct"] for i in first["ingredients"]) - 100.0) < 0.06
 
 
-def test_infeasible_constraints_422(client, db_session, monkeypatch):
+def test_infeasible_constraints_422(authed_client, db_session, monkeypatch):
     monkeypatch.setattr(nsga_service, "get_groq_gateway", lambda: FakeGateway())
-    r = client.post(
+    r = authed_client.post(
         "/api/v1/optimizer/run-nsga2?seed=5",
         json={
             "constraints": {"minStabilityPct": 100, "maxCogsIdrPerKg": 1, "minTkdnPct": 100, "targetViscosityMpaS": 5200},

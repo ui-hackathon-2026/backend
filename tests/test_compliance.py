@@ -76,17 +76,17 @@ def payload(items):
     }
 
 
-def audit(client, items, monkeypatch=None):
+def audit(authed_client, items, monkeypatch=None):
     if monkeypatch is not None:
         monkeypatch.setattr(
             compliance_service, "get_groq_gateway", lambda: FakeGateway()
         )
-    return client.post("/api/v1/compliance/audit", json=payload(items))
+    return authed_client.post("/api/v1/compliance/audit", json=payload(items))
 
 
-def test_compliant_audit_shape(client, db_session, monkeypatch):
+def test_compliant_audit_shape(authed_client, db_session, monkeypatch):
     seed(db_session)
-    body = audit(client, [("Phenoxyethanol", 0.8), ("Aqua", 99.2)], monkeypatch).json()
+    body = audit(authed_client, [("Phenoxyethanol", 0.8), ("Aqua", 99.2)], monkeypatch).json()
     assert body["overall_status"] == "COMPLIANT"
     assert body["audit_id"].startswith("audit_rag_")
     assert body["compliance_score"] == 1.0
@@ -103,10 +103,10 @@ def test_compliant_audit_shape(client, db_session, monkeypatch):
     assert "sejuk" in body["llm_reasoning"]["mandatory_label_warnings"][0]
 
 
-def test_violation_and_synonym_resolution(client, db_session, monkeypatch):
+def test_violation_and_synonym_resolution(authed_client, db_session, monkeypatch):
     seed(db_session)
     body = audit(
-        client,
+        authed_client,
         [("Phenoxyethanol", 1.2), ("Cocos Nucifera Oil", 3.0)],
         monkeypatch,
     ).json()
@@ -117,7 +117,7 @@ def test_violation_and_synonym_resolution(client, db_session, monkeypatch):
     assert body["total_tkdn_pct"] == 2.7
 
 
-def test_llm_fallback_without_gateway(client, db_session, monkeypatch):
+def test_llm_fallback_without_gateway(authed_client, db_session, monkeypatch):
     seed(db_session)
 
     class DeadGateway:
@@ -125,17 +125,17 @@ def test_llm_fallback_without_gateway(client, db_session, monkeypatch):
             raise Exception("down")
 
     monkeypatch.setattr(compliance_service, "get_groq_gateway", lambda: DeadGateway())
-    body = client.post(
+    body = authed_client.post(
         "/api/v1/compliance/audit", json=payload([("Aqua", 100.0)])
     ).json()
     assert body["overall_status"] == "COMPLIANT"
     assert body["llm_reasoning"]["local_substitution_recommendations"] == []
 
 
-def test_ask_rag(client, db_session, monkeypatch):
+def test_ask_rag(authed_client, db_session, monkeypatch):
     seed(db_session)
     monkeypatch.setattr(compliance_service, "get_groq_gateway", lambda: FakeGateway())
-    r = client.post(
+    r = authed_client.post(
         "/api/v1/compliance/ask-rag",
         json={"query": "Apakah Alpha-Arbutin 2% aman?", "category_context": "Serum"},
     )
@@ -146,7 +146,7 @@ def test_ask_rag(client, db_session, monkeypatch):
     assert body["confidence_score"] == 0.9
 
 
-def test_prohibited_substance_blocked(client, db_session, monkeypatch):
+def test_prohibited_substance_blocked(authed_client, db_session, monkeypatch):
     from app.models.compliance import ProhibitedSubstance
 
     seed(db_session)
@@ -154,14 +154,14 @@ def test_prohibited_substance_blocked(client, db_session, monkeypatch):
         ProhibitedSubstance(name="Hydroquinone dan garamnya", cas_number="123-31-9", entry_no="384")
     )
     db_session.commit()
-    body = audit(client, [("Hydroquinone", 1.0), ("Aqua", 99.0)], monkeypatch).json()
+    body = audit(authed_client, [("Hydroquinone", 1.0), ("Aqua", 99.0)], monkeypatch).json()
     assert body["overall_status"] == "NON_COMPLIANT"
     hydro = [a for a in body["ingredients_audit"] if a["inci"] == "Hydroquinone"][0]
     assert hydro["status"] == "FAILED"
     assert "dilarang" in hydro["audit_notes"]
 
 
-def test_hydroquinone_cross_reference(client, db_session):
+def test_hydroquinone_cross_reference(authed_client, db_session):
     from app.models.knowledge import KnowledgeChunk
     from app.services.compliance_service import retrieve
 

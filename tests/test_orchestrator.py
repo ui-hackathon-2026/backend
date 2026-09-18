@@ -48,12 +48,12 @@ def brief_input():
     }
 
 
-def test_synthesize_blueprint(client, db_session, monkeypatch):
+def test_synthesize_blueprint(authed_client, db_session, monkeypatch):
     seed(db_session)
     monkeypatch.setattr(
         orchestration_service, "get_groq_gateway", lambda: FakeGateway()
     )
-    r = client.post("/api/v1/orchestrator/synthesize", json=brief_input())
+    r = authed_client.post("/api/v1/orchestrator/synthesize", json=brief_input())
     assert r.status_code == 201
     body = r.json()
     assert body["id"].startswith("bp_")
@@ -64,17 +64,17 @@ def test_synthesize_blueprint(client, db_session, monkeypatch):
     assert body["systemHlb"] >= 0
 
 
-def test_synthesize_validations(client):
+def test_synthesize_validations(authed_client):
     bad_visc = brief_input()
     bad_visc["targetViscosityMpaS"] = 100.0
-    assert client.post("/api/v1/orchestrator/synthesize", json=bad_visc).status_code == 400
+    assert authed_client.post("/api/v1/orchestrator/synthesize", json=bad_visc).status_code == 400
     bad_cogs = brief_input()
     bad_cogs["maxCogsIdrPerKg"] = 5000.0
-    assert client.post("/api/v1/orchestrator/synthesize", json=bad_cogs).status_code == 400
+    assert authed_client.post("/api/v1/orchestrator/synthesize", json=bad_cogs).status_code == 400
 
 
-def test_chassis_sum_100(client):
-    body = client.get("/api/v1/orchestrator/chassis").json()
+def test_chassis_sum_100(authed_client):
+    body = authed_client.get("/api/v1/orchestrator/chassis").json()
     assert len(body) == 4
     brands = {c["brand"] for c in body}
     assert brands == {"Wardah", "Kahf", "Emina", "Labore"}
@@ -86,9 +86,9 @@ def test_chassis_sum_100(client):
         assert chassis["tkdnPct"] >= 0
 
 
-def test_hero_ingredients(client, db_session):
+def test_hero_ingredients(authed_client, db_session):
     seed(db_session)
-    body = client.get("/api/v1/orchestrator/hero-ingredients").json()
+    body = authed_client.get("/api/v1/orchestrator/hero-ingredients").json()
     assert len(body) == 3
     assert all(h["isLocalTkdn"] for h in body)
     vco = [h for h in body if h["inci"] == "Virgin Coconut Oil"][0]
@@ -96,14 +96,14 @@ def test_hero_ingredients(client, db_session):
     assert len(vco["benefit"]) > 0
 
 
-def test_parse_brief_pdf(client, monkeypatch):
+def test_parse_brief_pdf(authed_client, monkeypatch):
     from tests.test_projects import MINIMAL_PDF, make_pdf
 
     monkeypatch.setattr(
         orchestration_service, "get_groq_gateway", lambda: FakeGateway()
     )
     pdf = make_pdf(b"Ultra Hydrating Barrier Gel Wardah SPF 30")
-    r = client.post(
+    r = authed_client.post(
         "/api/v1/orchestrator/parse-brief-pdf",
         files={"file": ("brief.pdf", pdf, "application/pdf")},
     )
@@ -112,7 +112,7 @@ def test_parse_brief_pdf(client, monkeypatch):
     assert body["extractedBrief"]["brand"] == "Wardah"
     assert body["detectedClaims"] == ["12H Deep Barrier Hydration"]
     assert body["suggestedHeroIngredients"] == ["Virgin Coconut Oil (VCO) Riau"]
-    bad = client.post(
+    bad = authed_client.post(
         "/api/v1/orchestrator/parse-brief-pdf",
         files={"file": ("notes.txt", b"hi", "text/plain")},
     )

@@ -81,41 +81,18 @@ class FormulaVersionOutput(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class FormulaAdjustmentRequest(BaseModel):
-    prompt: str = Field(min_length=1, max_length=2000)
-
-
 class FormulaImportRequest(BaseModel):
     project_id: str = Field(min_length=1, max_length=64)
 
 
-class FormulaChangeItem(BaseModel):
-    ingredient_id: str
-    name: str
-    inci: str
-    phase: str
-    old_pct: float
-    new_pct: float
-    action: str = "modified"  # modified, added, removed
-
-
-class FormulaAdjustmentResponse(BaseModel):
-    formula_id: str
-    title: str
-    explanation: str
-    changes: list[FormulaChangeItem]
-    updated_phases: FormulaPhases
-    total_weight_pct: float
-
-
-class FormulaChatMessageCreate(BaseModel):
+class FormulaMessageCreate(BaseModel):
     role: str = Field(pattern="^(user|assistant|system)$")
-    content: str = Field(min_length=1, max_length=10000)
+    content: str = Field(min_length=1, max_length=8000)
     proposal: dict | None = None
-    linked_artifact_id: str | None = None
+    linked_artifact_id: str | None = Field(default=None, max_length=64)
 
 
-class FormulaChatMessageOutput(BaseModel):
+class FormulaMessageOutput(BaseModel):
     id: int
     session_id: str
     role: str
@@ -125,3 +102,24 @@ class FormulaChatMessageOutput(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+class AdjustmentChange(BaseModel):
+    ingredient_id: str | None = None
+    name: str
+    inci: str | None = None
+    old_pct: float | None = None
+    new_pct: float
+    phase: str
+    action: str
+
+
+class AdjustmentRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=4000)
+
+
+class AdjustmentResponse(BaseModel):
+    formula_id: str
+    title: str
+    explanation: str
+    changes: list[AdjustmentChange]
+    updated_phases: FormulaPhases
+    total_weight_pct: float

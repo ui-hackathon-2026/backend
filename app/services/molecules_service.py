@@ -92,19 +92,56 @@ def describe(mol: Chem.Mol, display_name: str, marker_name: str | None) -> dict:
         "atoms": atoms,
         "bonds": bonds,
         "molecular_weight": round(Descriptors.MolWt(mol), 2),
+        "molecular_formula": Descriptors.rdMolDescriptors.CalcMolFormula(mol),
         "logP": round(Descriptors.MolLogP(mol), 2),
         "tpsa": round(Descriptors.TPSA(mol), 2),
+        "h_bond_donors": Descriptors.NumHDonors(mol),
+        "h_bond_acceptors": Descriptors.NumHAcceptors(mol),
+        "rotatable_bonds": Descriptors.NumRotatableBonds(mol),
+        "charge": 0,
         "minimized_energy_kcal_mol": minimized_energy(mol),
     }
 
 
-def conformer(smiles: str, name: str | None) -> dict:
+def find_component(db, name: str | None, inci: str | None):
+    from app.models.structure import IngredientStructureComponent
+
+    if not name and not inci:
+        return None
+    try:
+        rows = db.query(IngredientStructureComponent).all()
+    except Exception:
+        return None
+    lowered_name = (name or "").lower()
+    lowered_inci = (inci or "").lower()
+    for row in rows:
+        row_inci = (row.ingredient_inci or "").lower()
+        if lowered_inci and row_inci == lowered_inci:
+            return row
+        if lowered_name and row_inci and row_inci in lowered_name:
+            return row
+    return None
+
+
+def conformer(db, smiles: str | None, name: str | None, inci: str | None = None) -> dict:
+    component = find_component(db, name, inci)
+    if component is not None and component.representation_type == "unresolved":
+        raise ConformerError(
+            component.caveat_note or "structure unavailable for this ingredient"
+        )
     marker = resolve_marker(name)
     if marker is not None:
         marker_name, marker_smiles = marker
         try:
-            return describe(embed(marker_smiles), marker_name, marker_name)
+            result = describe(embed(marker_smiles), marker_name, marker_name)
+            result["caveat_note"] = (
+                component.caveat_note if component else None
+            )
+            return result
         except ConformerError:
             pass
-    mol = embed(smiles)
-    return describe(mol, name or smiles, None)
+    if not smiles:
+        raise ConformerError("smiles required when no marker matches")
+    result = describe(embed(smiles), name or smiles, None)
+    result["caveat_note"] = component.caveat_note if component else None
+    return result

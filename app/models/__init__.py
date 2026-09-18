@@ -11,9 +11,11 @@ from app.models.compliance import BpomLimit, ProhibitedSubstance
 from app.models.competitor import CompetitorProduct
 from app.models.knowledge import KnowledgeChunk
 from app.models.formula import Formula, FormulaIngredient, FormulaVersion
+from app.models.formula_message import FormulaMessage
 from app.models.ingredient import Ingredient
 from app.models.project import Brief, Project
 from app.models.simulation_run import SimulationRun
+from app.models.structure import IngredientStructureComponent
 from app.models.user import RefreshToken, User
 
 __all__ = [
@@ -26,8 +28,10 @@ __all__ = [
     "CompetitorProduct",
     "Formula",
     "FormulaIngredient",
+    "FormulaMessage",
     "FormulaVersion",
     "Ingredient",
+    "IngredientStructureComponent",
     "KnowledgeChunk",
     "OptimizationJob",
     "ProhibitedSubstance",

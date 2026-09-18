@@ -47,3 +47,15 @@ def client(sqlite_engine):
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest.fixture()
+def authed_client(client):
+    r = client.post(
+        "/api/v1/auth/register",
+        json={"name": "Test Chemist", "email": "chemist@test.id", "password": "secret123"},
+    )
+    assert r.status_code == 201
+    token = r.json()["tokens"]["accessToken"]
+    client.headers.update({"Authorization": f"Bearer {token}"})
+    return client

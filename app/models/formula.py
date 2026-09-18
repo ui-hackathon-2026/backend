@@ -45,6 +45,10 @@ class FormulaIngredient(Base):
     weight_pct: Mapped[float] = mapped_column(Float)
     is_locked: Mapped[bool] = mapped_column(default=False)
     role: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    supplier_offer_id: Mapped[int | None] = mapped_column(nullable=True)
+    cost_idr_per_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    tkdn_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    cost_source: Mapped[str] = mapped_column(String(32), default="unknown")
     formula: Mapped[Formula] = relationship(back_populates="ingredients")
 
 

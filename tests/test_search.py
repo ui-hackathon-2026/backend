@@ -33,35 +33,35 @@ def seed(db_session):
     db_session.commit()
 
 
-def test_search_by_name(client, db_session):
+def test_search_by_name(authed_client, db_session):
     seed(db_session)
-    body = client.get("/api/v1/ingredients/search?q=niacinamide").json()
+    body = authed_client.get("/api/v1/ingredients/search?q=niacinamide").json()
     assert body["total"] == 1
     assert body["items"][0]["inci"] == "Niacinamide"
     assert body["items"][0]["phase"] == "D"
 
 
-def test_search_by_synonym(client, db_session):
+def test_search_by_synonym(authed_client, db_session):
     seed(db_session)
-    body = client.get("/api/v1/ingredients/search?q=vco").json()
+    body = authed_client.get("/api/v1/ingredients/search?q=vco").json()
     assert body["total"] == 1
     assert body["items"][0]["inci"] == "Virgin Coconut Oil"
 
 
-def test_search_by_indonesian_function(client, db_session):
+def test_search_by_indonesian_function(authed_client, db_session):
     seed(db_session)
-    body = client.get("/api/v1/ingredients/search?q=pengemulsi").json()
+    body = authed_client.get("/api/v1/ingredients/search?q=pengemulsi").json()
     assert body["total"] == 1
     assert body["items"][0]["role"] == "emulsifier"
-    body = client.get("/api/v1/ingredients/search?q=air").json()
+    body = authed_client.get("/api/v1/ingredients/search?q=air").json()
     assert any(i["inci"] == "Aqua" for i in body["items"])
 
 
-def test_search_filters(client, db_session):
+def test_search_filters(authed_client, db_session):
     seed(db_session)
-    body = client.get("/api/v1/ingredients/search?q=a&tkdn_min=50").json()
+    body = authed_client.get("/api/v1/ingredients/search?q=a&tkdn_min=50").json()
     assert {i["inci"] for i in body["items"]} == {"Virgin Coconut Oil", "Aqua"}
-    body = client.get("/api/v1/ingredients/search?q=a&phase=D").json()
+    body = authed_client.get("/api/v1/ingredients/search?q=a&phase=D").json()
     assert [i["inci"] for i in body["items"]] == ["Niacinamide"]
-    body = client.get("/api/v1/ingredients/search?q=xyznotfound").json()
+    body = authed_client.get("/api/v1/ingredients/search?q=xyznotfound").json()
     assert body == {"total": 0, "items": []}

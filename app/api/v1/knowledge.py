@@ -39,7 +39,7 @@ def fto_check(body: FtoRequest, db: SessionDep):
 @router.post("/molecules/conformer-3d", status_code=200)
 def conformer_3d(body: ConformerRequest, db: SessionDep):
     try:
-        return conformer(body.smiles, body.name)
+        return conformer(db, body.smiles, body.name, body.name)
     except ConformerError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
