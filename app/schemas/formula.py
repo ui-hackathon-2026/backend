@@ -79,3 +79,45 @@ class FormulaVersionOutput(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class FormulaMessageCreate(BaseModel):
+    role: str = Field(pattern="^(user|assistant|system)$")
+    content: str = Field(min_length=1, max_length=8000)
+    proposal: dict | None = None
+    linked_artifact_id: str | None = Field(default=None, max_length=64)
+
+
+class FormulaMessageOutput(BaseModel):
+    id: int
+    session_id: str
+    role: str
+    content: str
+    proposal: dict | None = None
+    linked_artifact_id: str | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AdjustmentChange(BaseModel):
+    ingredient_id: str | None = None
+    name: str
+    inci: str | None = None
+    old_pct: float | None = None
+    new_pct: float
+    phase: str
+    action: str
+
+
+class AdjustmentRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=4000)
+
+
+class AdjustmentResponse(BaseModel):
+    formula_id: str
+    title: str
+    explanation: str
+    changes: list[AdjustmentChange]
+    updated_phases: FormulaPhases
+    total_weight_pct: float

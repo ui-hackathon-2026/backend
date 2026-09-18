@@ -160,3 +160,67 @@ def test_missing_returns_404(authed_client):
     assert authed_client.put("/api/v1/formulas/form_nope", json=payload()).status_code == 404
     assert authed_client.delete("/api/v1/formulas/form_nope").status_code == 404
     assert authed_client.get("/api/v1/formulas/form_nope/versions").status_code == 404
+
+
+class FakeGateway:
+    def chat_json(self, messages, model=None, max_tokens=1024):
+        return {
+            "title": "Kurangi Glyceryl Stearate",
+            "explanation": "Turunkan biaya.",
+            "changes": [
+                {
+                    "ingredient_id": "ing-1",
+                    "name": "Glyceryl Stearate",
+                    "inci": "Glyceryl Stearate",
+                    "new_pct": 2.0,
+                    "phase": "C",
+                    "action": "modified",
+                }
+            ],
+            "updated_phases": {
+                "phase_a": [{"inci": "Caprylic/Capric Triglyceride", "weight_pct": 8.0}],
+                "phase_b": [{"inci": "Aqua", "weight_pct": 84.0}],
+                "phase_c": [{"inci": "Glyceryl Stearate", "weight_pct": 2.0}],
+                "phase_d": [{"inci": "Panthenol", "weight_pct": 6.0}],
+            },
+        }
+
+
+def test_propose_adjustment(authed_client, monkeypatch):
+    import app.services.formula_service as formula_service
+
+    monkeypatch.setattr(formula_service, "get_groq_gateway", lambda: FakeGateway())
+    fid = authed_client.post("/api/v1/formulas", json=payload()).json()["formula_id"]
+    r = authed_client.post(
+        f"/api/v1/formulas/{fid}/propose-adjustment",
+        json={"prompt": "kurangi squalane biar murah"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["formula_id"] == fid
+    assert body["changes"][0]["old_pct"] == 3.0
+    assert body["changes"][0]["new_pct"] == 2.0
+    assert abs(body["total_weight_pct"] - 100.0) < 0.01
+    assert authed_client.post(
+        "/api/v1/formulas/form_nope/propose-adjustment",
+        json={"prompt": "hi"},
+    ).status_code == 404
+
+
+def test_formula_messages_roundtrip(authed_client):
+    fid = authed_client.post("/api/v1/formulas", json=payload()).json()["formula_id"]
+    assert authed_client.get(f"/api/v1/formulas/{fid}/messages").json() == []
+    first = authed_client.post(
+        f"/api/v1/formulas/{fid}/messages",
+        json={"role": "user", "content": "halo"},
+    )
+    assert first.status_code == 201
+    assert first.json()["session_id"].startswith("sess_")
+    second = authed_client.post(
+        f"/api/v1/formulas/{fid}/messages",
+        json={"role": "assistant", "content": "hai juga"},
+    )
+    assert second.json()["session_id"] == first.json()["session_id"]
+    listing = authed_client.get(f"/api/v1/formulas/{fid}/messages").json()
+    assert [m["role"] for m in listing] == ["user", "assistant"]
+    assert authed_client.get("/api/v1/formulas/form_nope/messages").status_code == 404

@@ -2,17 +2,24 @@ from fastapi import APIRouter, HTTPException, Response, status
 
 from app.api.deps import OptionalUserDep, SessionDep
 from app.schemas.formula import (
+    AdjustmentRequest,
+    AdjustmentResponse,
     FormulaCreate,
+    FormulaMessageCreate,
+    FormulaMessageOutput,
     FormulaResponse,
     FormulaUpdate,
     FormulaVersionOutput,
 )
 from app.services.formula_service import (
+    add_message,
     create_formula,
     delete_formula,
     get_formula,
     list_formulas,
+    list_messages,
     list_versions,
+    propose_adjustment,
     update_formula,
 )
 
@@ -82,6 +89,45 @@ def versions(
 ) -> list[FormulaVersionOutput]:
     owner_id = user.id if user else None
     result = list_versions(db, formula_id, owner_id=owner_id)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Formula not found"
+        )
+    return result
+
+
+@router.get("/{formula_id}/messages", response_model=list[FormulaMessageOutput])
+def messages(
+    formula_id: str, db: SessionDep, user: OptionalUserDep
+) -> list[FormulaMessageOutput]:
+    owner_id = user.id if user else None
+    result = list_messages(db, formula_id, owner_id=owner_id)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Formula not found"
+        )
+    return result
+
+
+@router.post("/{formula_id}/messages", response_model=FormulaMessageOutput, status_code=201)
+def post_message(
+    formula_id: str, body: FormulaMessageCreate, db: SessionDep, user: OptionalUserDep
+) -> FormulaMessageOutput:
+    owner_id = user.id if user else None
+    result = add_message(db, formula_id, body, owner_id=owner_id)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Formula not found"
+        )
+    return result
+
+
+@router.post("/{formula_id}/propose-adjustment", response_model=AdjustmentResponse)
+def propose(
+    formula_id: str, body: AdjustmentRequest, db: SessionDep, user: OptionalUserDep
+) -> AdjustmentResponse:
+    owner_id = user.id if user else None
+    result = propose_adjustment(db, formula_id, body, owner_id=owner_id)
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Formula not found"
