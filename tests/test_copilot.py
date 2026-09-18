@@ -1,8 +1,22 @@
 import json
 
 from app.models.chat import ChatMessage, ChatSession
-from app.schemas.copilot import ChatRequest
+from app.schemas.copilot import ChatRequest, FormulationSpec
 from app.services.copilot_service import run_chat_events
+
+
+def test_spec_tolerates_null_fields():
+    spec = FormulationSpec(**{
+        "product_category": None,
+        "emulsion_type": None,
+        "target_spf": None,
+        "viscosity_target_range": None,
+        "locked_actives": None,
+        "stability_requirement": None,
+    })
+    assert spec.product_category == "unknown"
+    assert spec.emulsion_type == "unknown"
+    assert spec.locked_actives == []
 
 
 class FakeGateway:

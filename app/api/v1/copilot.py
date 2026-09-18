@@ -23,6 +23,9 @@ def chat(body: ChatRequest, db: SessionDep):
         except LLMUnavailableError as exc:
             logger.error("llm unavailable: %s", exc)
             yield 'data: {"type": "error", "detail": "ai engine unavailable"}\n\n'
+        except Exception as exc:
+            logger.error("chat failed: %s", exc)
+            yield 'data: {"type": "error", "detail": "chat processing failed"}\n\n'
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

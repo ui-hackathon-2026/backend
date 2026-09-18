@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class LockedActive(BaseModel):
@@ -13,6 +13,18 @@ class FormulationSpec(BaseModel):
     viscosity_target_range: list[float] | None = None
     locked_actives: list[LockedActive] = Field(default_factory=list)
     stability_requirement: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def drop_nulls_for_required(cls, data):
+        if isinstance(data, dict):
+            return {
+                key: value
+                for key, value in data.items()
+                if value is not None
+                or key not in ("product_category", "emulsion_type", "locked_actives")
+            }
+        return data
 
 
 class ChatRequest(BaseModel):
