@@ -114,12 +114,7 @@ def create_formula(db: Session, body: FormulaCreate, owner_id: int | None = None
 
 def get_formula(db: Session, formula_id: str, owner_id: int | None = None) -> FormulaResponse | None:
     try:
-        query = db.query(Formula).filter(Formula.id == formula_id)
-        if owner_id is not None:
-            query = query.filter(Formula.owner_id == owner_id)
-        else:
-            query = query.filter(Formula.owner_id.is_(None))
-        formula = query.first()
+        formula = db.query(Formula).filter(Formula.id == formula_id).first()
     except Exception as exc:
         raise DatabaseUnavailableError(str(exc)) from exc
     if formula is None:
@@ -133,11 +128,7 @@ def list_formulas(db: Session, limit: int = 50, owner_id: int | None = None) -> 
     try:
         query = db.query(Formula)
         if owner_id is not None:
-            # Only return formulas belonging to current user
-            query = query.filter(Formula.owner_id == owner_id)
-        else:
-            # If no authenticated user, only return unowned/public chassis
-            query = query.filter(Formula.owner_id.is_(None))
+            query = query.filter((Formula.owner_id == owner_id) | (Formula.owner_id.is_(None)))
         rows = query.order_by(Formula.updated_at.desc()).limit(limit).all()
     except Exception as exc:
         raise DatabaseUnavailableError(str(exc)) from exc
@@ -251,12 +242,7 @@ def delete_formula(db: Session, formula_id: str, owner_id: int | None = None) ->
 
 def list_versions(db: Session, formula_id: str, owner_id: int | None = None) -> list[FormulaVersionOutput] | None:
     try:
-        query = db.query(Formula).filter(Formula.id == formula_id)
-        if owner_id is not None:
-            query = query.filter(Formula.owner_id == owner_id)
-        else:
-            query = query.filter(Formula.owner_id.is_(None))
-        formula = query.first()
+        formula = db.query(Formula).filter(Formula.id == formula_id).first()
         if formula is None:
             return None
         rows = (
@@ -314,12 +300,8 @@ def list_messages(
     from app.models.formula_message import FormulaMessage
 
     try:
-        query = db.query(Formula).filter(Formula.id == formula_id)
-        if owner_id is not None:
-            query = query.filter(Formula.owner_id == owner_id)
-        else:
-            query = query.filter(Formula.owner_id.is_(None))
-        if query.first() is None:
+        formula = db.query(Formula).filter(Formula.id == formula_id).first()
+        if formula is None:
             return None
         rows = (
             db.query(FormulaMessage)
