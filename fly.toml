@@ -1,0 +1,23 @@
+# Generated for manual `fly launch`/`fly deploy`. App name must be globally
+# unique on Fly.io — change it if `hackui-backend` is already taken.
+app = "hackui-backend"
+primary_region = "sin"
+
+[build]
+
+[env]
+  APP_NAME = "Hackathon API"
+  DEBUG = "false"
+  # DATABASE_URL, SECRET_KEY, GROQ_API_KEY_1, GROQ_API_KEY_2, CORS_ORIGINS
+  # are secrets — set them with `fly secrets set`, never here.
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"
