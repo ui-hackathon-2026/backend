@@ -39,6 +39,8 @@ def total_weight(items) -> float:
 
 def check_total(items) -> float:
     total = total_weight(items)
+    if len(items) == 0:
+        return 0.0
     if not (WEIGHT_SUM_MIN <= total <= WEIGHT_SUM_MAX):
         raise FormulaWeightError(f"weights sum to {total}, expected 100")
     return total
@@ -53,7 +55,7 @@ def to_response(formula: Formula, total: float) -> FormulaResponse:
         notes=formula.notes,
         project_id=formula.project_id,
         total_weight_pct=total,
-        status=VALID_BALANCED,
+        status="EMPTY_DRAFT" if len(formula.ingredients) == 0 else VALID_BALANCED,
         updated_at=formula.updated_at,
         ingredients=[
             {
@@ -146,7 +148,11 @@ def list_formulas(db: Session, limit: int = 50, owner_id: int | None = None) -> 
 
 
 def update_formula(
-    db: Session, formula_id: str, body: FormulaUpdate, owner_id: int | None = None
+    db: Session,
+    formula_id: str,
+    body: FormulaUpdate,
+    owner_id: int | None = None,
+    create_version: bool = True,
 ) -> FormulaResponse | None:
     items = body.phases.flattened()
     total = check_total(items)
@@ -159,35 +165,36 @@ def update_formula(
         formula = query.first()
         if formula is None:
             return None
-        latest = (
-            db.query(FormulaVersion)
-            .filter(FormulaVersion.formula_id == formula_id)
-            .order_by(FormulaVersion.version.desc())
-            .first()
-        )
-        db.add(
-            FormulaVersion(
-                formula_id=formula_id,
-                version=(latest.version + 1) if latest else 1,
-                snapshot={
-                    "name": formula.name,
-                    "category": formula.category,
-                    "batch_size_g": formula.batch_size_g,
-                    "notes": formula.notes,
-                    "ingredients": [
-                        {
-                            "phase": i.phase,
-                            "inci": i.inci,
-                            "name": i.name,
-                            "smiles": i.smiles,
-                            "weight_pct": i.weight_pct,
-                            "is_locked": i.is_locked,
-                        }
-                        for i in formula.ingredients
-                    ],
-                },
+        if create_version:
+            latest = (
+                db.query(FormulaVersion)
+                .filter(FormulaVersion.formula_id == formula_id)
+                .order_by(FormulaVersion.version.desc())
+                .first()
             )
-        )
+            db.add(
+                FormulaVersion(
+                    formula_id=formula_id,
+                    version=(latest.version + 1) if latest else 1,
+                    snapshot={
+                        "name": formula.name,
+                        "category": formula.category,
+                        "batch_size_g": formula.batch_size_g,
+                        "notes": formula.notes,
+                        "ingredients": [
+                            {
+                                "phase": i.phase,
+                                "inci": i.inci,
+                                "name": i.name,
+                                "smiles": i.smiles,
+                                "weight_pct": i.weight_pct,
+                                "is_locked": i.is_locked,
+                            }
+                            for i in formula.ingredients
+                        ],
+                    },
+                )
+            )
         formula.name = body.name
         formula.category = body.category
         formula.batch_size_g = body.batch_size_g

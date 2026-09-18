@@ -98,8 +98,6 @@ class FormulaMessageOutput(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
-
-
 class AdjustmentChange(BaseModel):
     ingredient_id: str | None = None
     name: str

@@ -61,9 +61,12 @@ def update(
     body: FormulaUpdate,
     db: SessionDep,
     user: OptionalUserDep,
+    create_version: bool = True,
 ) -> FormulaResponse:
     owner_id = user.id if user else None
-    result = update_formula(db, formula_id, body, owner_id=owner_id)
+    result = update_formula(
+        db, formula_id, body, owner_id=owner_id, create_version=create_version
+    )
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Formula not found"
