@@ -85,6 +85,10 @@ class FormulaAdjustmentRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=2000)
 
 
+class FormulaImportRequest(BaseModel):
+    project_id: str = Field(min_length=1, max_length=64)
+
+
 class FormulaChangeItem(BaseModel):
     ingredient_id: str
     name: str

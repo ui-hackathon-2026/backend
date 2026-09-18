@@ -44,6 +44,7 @@ class FormulaIngredient(Base):
     smiles: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     weight_pct: Mapped[float] = mapped_column(Float)
     is_locked: Mapped[bool] = mapped_column(default=False)
+    role: Mapped[str | None] = mapped_column(String(64), nullable=True)
     formula: Mapped[Formula] = relationship(back_populates="ingredients")
 
 

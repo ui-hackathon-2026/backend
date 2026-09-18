@@ -7,6 +7,7 @@ from app.schemas.formula import (
     FormulaChatMessageCreate,
     FormulaChatMessageOutput,
     FormulaCreate,
+    FormulaImportRequest,
     FormulaResponse,
     FormulaUpdate,
     FormulaVersionOutput,
@@ -16,6 +17,7 @@ from app.services.formula_service import (
     create_formula,
     delete_formula,
     get_formula,
+    import_formula_to_project,
     list_formula_chat_messages,
     list_formulas,
     list_versions,
@@ -36,10 +38,22 @@ def create(
 
 @router.get("", response_model=list[FormulaResponse])
 def list_all(
-    db: SessionDep, user: OptionalUserDep, limit: int = 50
+    db: SessionDep,
+    user: OptionalUserDep,
+    limit: int = 50,
+    offset: int = 0,
+    project_id: str | None = None,
+    q: str | None = None,
 ) -> list[FormulaResponse]:
     owner_id = user.id if user else None
-    return list_formulas(db, limit=min(limit, 200), owner_id=owner_id)
+    return list_formulas(
+        db,
+        limit=min(limit, 2000),
+        owner_id=owner_id,
+        project_id=project_id,
+        offset=max(offset, 0),
+        q=q,
+    )
 
 
 @router.get("/{formula_id}", response_model=FormulaResponse)
@@ -89,6 +103,24 @@ def propose_adjustment(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Formula not found or contains no ingredients to adjust",
+        )
+    return result
+
+
+@router.post("/{formula_id}/import", response_model=FormulaResponse, status_code=201)
+def import_to_project(
+    formula_id: str,
+    body: FormulaImportRequest,
+    db: SessionDep,
+    user: OptionalUserDep,
+) -> FormulaResponse:
+    owner_id = user.id if user else None
+    result = import_formula_to_project(
+        db, formula_id, body.project_id, owner_id=owner_id
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Formula not found"
         )
     return result
 
