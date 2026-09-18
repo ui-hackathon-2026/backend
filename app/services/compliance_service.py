@@ -74,14 +74,31 @@ def xref_group(tag: str) -> str | None:
     return re.sub(r"-\d+$", "", tag)
 
 
+STOPWORDS = {
+    "apakah", "bagaimana", "berapa", "kadar", "boleh", "tidak", "bisa",
+    "digunakan", "untuk", "dalam", "pada", "yang", "dan", "atau", "dari",
+    "tentang", "adalah", "sediaan", "produk", "menurut", "regulasi", "bpom",
+    "apa", "halal", "kosmetik", "kosmetika", "maksimum", "minimal", "sebagai"
+}
+
+
 def load_reference(db: Session):
     try:
-        limits = {row.inci: row for row in db.query(BpomLimit).all()}
-        catalog = {row.inci: row for row in db.query(Ingredient).all()}
+        limits = {row.inci.lower(): row for row in db.query(BpomLimit).all()}
+        catalog = {row.inci.lower(): row for row in db.query(Ingredient).all()}
         chunks = db.query(KnowledgeChunk).all()
         blocked = set()
         for row in db.query(ProhibitedSubstance).all():
             blocked |= blocklist_aliases(row.name)
+        # Also include any chunk explicitly categorized as prohibited
+        for c in chunks:
+            if c.category == "prohibited":
+                if c.substance_name:
+                    blocked |= blocklist_aliases(c.substance_name)
+                if c.inci_name:
+                    blocked.add(c.inci_name.strip().lower())
+                for syn in c.synonyms or []:
+                    blocked.add(syn.strip().lower())
     except Exception as exc:
         raise DatabaseUnavailableError(str(exc)) from exc
     return limits, catalog, chunks, blocked
@@ -93,39 +110,58 @@ def clean_names(*values) -> list[str]:
 
 def normalize_inci(raw: str, catalog: dict, chunks: list) -> str | None:
     lowered = raw.strip().lower()
-    for inci in catalog:
-        if inci.lower() == lowered:
-            return inci
-    for inci, row in catalog.items():
+    if lowered in catalog:
+        return lowered
+    for key, row in catalog.items():
         if lowered in [s.lower() for s in (row.synonyms or [])]:
-            return inci
+            return key
     for chunk in chunks:
         names = clean_names(
             chunk.inci_name, chunk.substance_name, *(chunk.synonyms or [])
         )
         if lowered in [n.lower() for n in names]:
-            if chunk.inci_name in catalog:
-                return chunk.inci_name
-            return chunk.inci_name
-    return None
+            c_inci = chunk.inci_name.lower() if chunk.inci_name else chunk.substance_name.lower()
+            return c_inci
+    return lowered
 
 
-def score_chunk(chunk: KnowledgeChunk, query_tokens: set[str]) -> int:
-    haystack = " ".join(
-        clean_names(
-            chunk.title,
-            chunk.substance_name,
-            chunk.inci_name,
-            chunk.category,
-            chunk.raw_text,
-        )
-        + [" ".join(chunk.synonyms or []), " ".join(chunk.tags or [])]
-    )
-    return len(tokens(haystack) & query_tokens)
+def score_chunk(chunk: KnowledgeChunk, query_tokens: set[str], full_query_lower: str = "") -> float:
+    meaningful_tokens = {t for t in query_tokens if t not in STOPWORDS}
+    if not meaningful_tokens:
+        meaningful_tokens = query_tokens
+
+    score = 0.0
+
+    substance_names = [
+        chunk.substance_name.lower() if chunk.substance_name else "",
+        chunk.inci_name.lower() if chunk.inci_name else "",
+        chunk.cas_number.lower() if chunk.cas_number else "",
+    ] + [s.lower() for s in (chunk.synonyms or [])]
+
+    for name in substance_names:
+        if not name:
+            continue
+        if name in full_query_lower:
+            score += 60.0
+        name_toks = tokens(name)
+        score += len(name_toks & meaningful_tokens) * 25.0
+
+    title_toks = tokens(chunk.title or "")
+    score += len(title_toks & meaningful_tokens) * 8.0
+
+    tags_toks = tokens(" ".join(chunk.tags or []))
+    score += len(tags_toks & meaningful_tokens) * 6.0
+
+    raw_toks = tokens(chunk.raw_text or "")
+    score += len(raw_toks & meaningful_tokens) * 1.5
+
+    return score
 
 
 def retrieve(chunks: list, text: str, top_k: int = 3):
-    scored = [(score_chunk(c, tokens(text)), c) for c in chunks]
+    text_lower = text.lower()
+    q_tokens = tokens(text)
+    scored = [(score_chunk(c, q_tokens, text_lower), c) for c in chunks]
     scored = [(s, c) for s, c in scored if s > 0]
     scored.sort(key=lambda pair: pair[0], reverse=True)
     hits = [c for _, c in scored[:top_k]]
