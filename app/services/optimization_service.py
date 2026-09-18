@@ -43,14 +43,49 @@ POOL = [
 MAX_COGS_NORM = 1000000.0
 
 
+DEFAULT_COSTS = {
+    "Aqua": 2500.0,
+    "Caprylic/Capric Triglyceride": 85000.0,
+    "Dimethicone": 120000.0,
+    "Squalane": 380000.0,
+    "Virgin Coconut Oil": 65000.0,
+    "Ethylhexyl Methoxycinnamate": 210000.0,
+    "Glycerin": 45000.0,
+    "Butylene Glycol": 95000.0,
+    "Glyceryl Stearate": 110000.0,
+    "Polysorbate 60": 130000.0,
+    "Niacinamide": 220000.0,
+    "Panthenol": 350000.0,
+    "Tocopheryl Acetate": 280000.0,
+    "Phenoxyethanol": 160000.0,
+}
+
+DEFAULT_TKDN = {
+    "Aqua": 100.0,
+    "Virgin Coconut Oil": 95.0,
+    "Glycerin": 80.0,
+    "Caprylic/Capric Triglyceride": 65.0,
+    "Glyceryl Stearate": 55.0,
+    "Squalane": 45.0,
+    "Polysorbate 60": 25.0,
+    "Dimethicone": 0.0,
+    "Ethylhexyl Methoxycinnamate": 0.0,
+    "Butylene Glycol": 0.0,
+    "Niacinamide": 0.0,
+    "Panthenol": 0.0,
+    "Tocopheryl Acetate": 0.0,
+    "Phenoxyethanol": 0.0,
+}
+
+
 def catalog_maps(db: Session) -> tuple[dict, dict, set[str]]:
     try:
         rows = db.query(Ingredient).all()
     except Exception as exc:
         raise DatabaseUnavailableError(str(exc)) from exc
-    cost = {r.inci: r.cost_per_kg_idr or 0.0 for r in rows}
-    tkdn = {r.inci: r.tkdn_pct or 0.0 for r in rows}
-    known = {r.inci for r in rows}
+    cost = {**DEFAULT_COSTS, **{r.inci: r.cost_per_kg_idr for r in rows if r.cost_per_kg_idr is not None}}
+    tkdn = {**DEFAULT_TKDN, **{r.inci: r.tkdn_pct for r in rows if r.tkdn_pct is not None}}
+    known = {r.inci for r in rows} | set(DEFAULT_COSTS.keys())
     return cost, tkdn, known
 
 
