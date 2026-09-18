@@ -114,6 +114,8 @@ def create_formula(db: Session, body: FormulaCreate, owner_id: int | None = None
 
 def get_formula(db: Session, formula_id: str, owner_id: int | None = None) -> FormulaResponse | None:
     try:
+        # NOTE: not filtering by owner_id so every formula
+        # (a user's own plus the seeded owner_id=NULL library) is viewable.
         formula = db.query(Formula).filter(Formula.id == formula_id).first()
     except Exception as exc:
         raise DatabaseUnavailableError(str(exc)) from exc
@@ -124,12 +126,30 @@ def get_formula(db: Session, formula_id: str, owner_id: int | None = None) -> Fo
     )
 
 
-def list_formulas(db: Session, limit: int = 50, owner_id: int | None = None) -> list[FormulaResponse]:
+def list_formulas(
+    db: Session,
+    limit: int = 50,
+    owner_id: int | None = None,
+    project_id: str | None = None,
+    offset: int = 0,
+    q: str | None = None,
+) -> list[FormulaResponse]:
     try:
+        # NOTE: temporarily not filtering by owner_id so every formula
+        # (a user's own plus the seeded owner_id=NULL library) is listed.
         query = db.query(Formula)
         if owner_id is not None:
             query = query.filter((Formula.owner_id == owner_id) | (Formula.owner_id.is_(None)))
-        rows = query.order_by(Formula.updated_at.desc()).limit(limit).all()
+        if project_id is not None:
+            query = query.filter(Formula.project_id == project_id)
+        if q:
+            query = query.filter(Formula.name.ilike(f"%{q}%"))
+        rows = (
+            query.order_by(Formula.updated_at.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
     except Exception as exc:
         raise DatabaseUnavailableError(str(exc)) from exc
     return [
@@ -220,6 +240,50 @@ def update_formula(
         db.rollback()
         raise DatabaseUnavailableError(str(exc)) from exc
     return to_response(formula, total)
+
+
+def import_formula_to_project(
+    db: Session, formula_id: str, project_id: str, owner_id: int | None = None
+) -> FormulaResponse | None:
+    """Copy an existing formula (e.g. from the library) into a workspace as
+    its own independent formula row, leaving the source untouched."""
+    try:
+        source = db.query(Formula).filter(Formula.id == formula_id).first()
+        if source is None:
+            return None
+        copy = Formula(
+            id=new_formula_id(),
+            name=source.name,
+            category=source.category,
+            batch_size_g=source.batch_size_g,
+            notes=source.notes,
+            project_id=project_id,
+            owner_id=owner_id,
+        )
+        db.add(copy)
+        for ing in source.ingredients:
+            db.add(
+                FormulaIngredient(
+                    formula_id=copy.id,
+                    phase=ing.phase,
+                    inci=ing.inci,
+                    name=ing.name,
+                    smiles=ing.smiles,
+                    weight_pct=ing.weight_pct,
+                    is_locked=ing.is_locked,
+                    role=ing.role,
+                    supplier_offer_id=ing.supplier_offer_id,
+                    cost_idr_per_kg=ing.cost_idr_per_kg,
+                    tkdn_pct=ing.tkdn_pct,
+                    cost_source=ing.cost_source,
+                )
+            )
+        db.commit()
+        db.refresh(copy)
+    except Exception as exc:
+        db.rollback()
+        raise DatabaseUnavailableError(str(exc)) from exc
+    return to_response(copy, total_weight([(i.phase, i) for i in copy.ingredients]))
 
 
 def delete_formula(db: Session, formula_id: str, owner_id: int | None = None) -> bool:

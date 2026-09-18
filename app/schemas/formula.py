@@ -81,6 +81,10 @@ class FormulaVersionOutput(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class FormulaImportRequest(BaseModel):
+    project_id: str = Field(min_length=1, max_length=64)
+
+
 class FormulaMessageCreate(BaseModel):
     role: str = Field(pattern="^(user|assistant|system)$")
     content: str = Field(min_length=1, max_length=8000)

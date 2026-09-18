@@ -26,7 +26,7 @@ def create(body: ProjectCreate, db: SessionDep) -> ProjectResponse:
 
 @router.get("", response_model=list[ProjectResponse])
 def list_all(db: SessionDep, limit: int = 50) -> list[ProjectResponse]:
-    return list_projects(db, limit=min(limit, 200))
+    return list_projects(db, limit=min(limit, 2000))
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)

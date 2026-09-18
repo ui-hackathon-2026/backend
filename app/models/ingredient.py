@@ -28,3 +28,11 @@ class Ingredient(Base):
     structure_representation_type: Mapped[str] = mapped_column(
         String(32), default="unresolved"
     )
+    entity_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    identity_source: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    identity_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    molecular_weight: Mapped[float | None] = mapped_column(Float, nullable=True)
+    logp: Mapped[float | None] = mapped_column(Float, nullable=True)
+    tpsa: Mapped[float | None] = mapped_column(Float, nullable=True)
+    hbd: Mapped[int | None] = mapped_column(nullable=True)
+    hba: Mapped[int | None] = mapped_column(nullable=True)
