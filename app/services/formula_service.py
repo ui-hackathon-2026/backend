@@ -114,7 +114,7 @@ def create_formula(db: Session, body: FormulaCreate, owner_id: int | None = None
 
 def get_formula(db: Session, formula_id: str, owner_id: int | None = None) -> FormulaResponse | None:
     try:
-        # NOTE: temporarily not filtering by owner_id so every formula
+        # NOTE: not filtering by owner_id so every formula
         # (a user's own plus the seeded owner_id=NULL library) is viewable.
         formula = db.query(Formula).filter(Formula.id == formula_id).first()
     except Exception as exc:
@@ -138,6 +138,8 @@ def list_formulas(
         # NOTE: temporarily not filtering by owner_id so every formula
         # (a user's own plus the seeded owner_id=NULL library) is listed.
         query = db.query(Formula)
+        if owner_id is not None:
+            query = query.filter((Formula.owner_id == owner_id) | (Formula.owner_id.is_(None)))
         if project_id is not None:
             query = query.filter(Formula.project_id == project_id)
         if q:
@@ -304,12 +306,7 @@ def delete_formula(db: Session, formula_id: str, owner_id: int | None = None) ->
 
 def list_versions(db: Session, formula_id: str, owner_id: int | None = None) -> list[FormulaVersionOutput] | None:
     try:
-        query = db.query(Formula).filter(Formula.id == formula_id)
-        if owner_id is not None:
-            query = query.filter(Formula.owner_id == owner_id)
-        else:
-            query = query.filter(Formula.owner_id.is_(None))
-        formula = query.first()
+        formula = db.query(Formula).filter(Formula.id == formula_id).first()
         if formula is None:
             return None
         rows = (
@@ -367,12 +364,8 @@ def list_messages(
     from app.models.formula_message import FormulaMessage
 
     try:
-        query = db.query(Formula).filter(Formula.id == formula_id)
-        if owner_id is not None:
-            query = query.filter(Formula.owner_id == owner_id)
-        else:
-            query = query.filter(Formula.owner_id.is_(None))
-        if query.first() is None:
+        formula = db.query(Formula).filter(Formula.id == formula_id).first()
+        if formula is None:
             return None
         rows = (
             db.query(FormulaMessage)
