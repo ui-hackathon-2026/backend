@@ -14,4 +14,6 @@ COPY . .
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8080"]
+# Migrations run once per deploy via fly.toml's [deploy] release_command,
+# not on every machine boot — keeps cold-start from scale-to-zero fast.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

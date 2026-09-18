@@ -5,6 +5,12 @@ primary_region = "sin"
 
 [build]
 
+[deploy]
+  # Runs once per deploy (not on every cold-start boot from scale-to-zero),
+  # keeping machine startup fast so Fly's proxy doesn't 502 the first
+  # request after an idle period.
+  release_command = "alembic upgrade head"
+
 [env]
   APP_NAME = "Hackathon API"
   DEBUG = "false"
