@@ -66,6 +66,24 @@ class GroqGateway:
                 time.monotonic() + settings.groq_key_cooldown_s
             )
 
+    def _extract_json(self, text: str) -> dict:
+        """Extract JSON object from a response that may contain extra text."""
+        text = text.strip()
+        # Try direct parse first
+        try:
+            return json.loads(text)
+        except ValueError:
+            pass
+        # Find first {...} block
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            try:
+                return json.loads(text[start : end + 1])
+            except ValueError:
+                pass
+        raise LLMUnavailableError("groq returned non-JSON content")
+
     def chat_json(
         self,
         messages: list[dict],
@@ -74,7 +92,7 @@ class GroqGateway:
     ) -> dict:
         attempts = 0
         payload_messages = [
-            {"role": "system", "content": "Return valid JSON only."},
+            {"role": "system", "content": "Return valid JSON only. No explanation, no markdown, just the JSON object."},
             *messages,
         ]
         while attempts < len(self._keys):
@@ -89,7 +107,6 @@ class GroqGateway:
                     json={
                         "model": model or settings.groq_model_agent,
                         "messages": payload_messages,
-                        "response_format": {"type": "json_object"},
                         "max_tokens": max_tokens,
                     },
                 )
@@ -99,15 +116,12 @@ class GroqGateway:
             if response.status_code == 200:
                 try:
                     content = response.json()["choices"][0]["message"]["content"]
-                    return json.loads(content)
+                    return self._extract_json(content)
                 except (KeyError, IndexError, ValueError) as exc:
                     raise LLMUnavailableError(
                         f"groq key at position {index} returned unparseable json"
                     ) from exc
-            if response.status_code in (401, 429):
-                self._cool(index)
-                continue
-            if response.status_code == 400 and JSON_RETRYABLE_CODE in response.text:
+            if response.status_code in (400, 401, 429):
                 self._cool(index)
                 continue
             if 500 <= response.status_code < 600:
@@ -147,7 +161,7 @@ class GroqGateway:
                 continue
             with stream as response:
                 if response.status_code != 200:
-                    if response.status_code in (401, 429) or (
+                    if response.status_code in (400, 401, 429) or (
                         500 <= response.status_code < 600
                     ):
                         self._cool(index)

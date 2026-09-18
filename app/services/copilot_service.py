@@ -97,9 +97,10 @@ def run_chat_events(
     session = ensure_session(db, body)
     yield {"type": "meta", "session_id": session.id}
     save_message(db, session.id, "user", body.message)
-    context_parts = [body.message]
+    context_parts = [body.message[:1000]]
     if body.canvas:
-        context_parts.append(f"Active canvas: {json.dumps(body.canvas)[:2000]}")
+        canvas_json = json.dumps(body.canvas)[:1000]
+        context_parts.append(f"Active canvas: {canvas_json}")
     brief_text = load_brief_text(db, body.brief_id)
     if brief_text:
         context_parts.append(f"Marketing brief: {brief_text}")
