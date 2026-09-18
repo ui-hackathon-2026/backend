@@ -474,3 +474,135 @@ def list_versions(db: Session, formula_id: str, owner_id: int | None = None) -> 
         )
         for r in rows
     ]
+
+
+def get_formula_chat_session(
+    db: Session, formula_id: str, owner_id: int | None = None
+):
+    import json
+    from app.models.chat import ChatMessage, ChatSession
+
+    # Verify formula exists and belongs to user
+    query = db.query(Formula).filter(Formula.id == formula_id)
+    if owner_id is not None:
+        query = query.filter(Formula.owner_id == owner_id)
+    else:
+        query = query.filter(Formula.owner_id.is_(None))
+    formula = query.first()
+    if formula is None:
+        return None
+
+    session_id = f"sess_{formula_id}"
+    session = db.get(ChatSession, session_id)
+    if session is None:
+        session = ChatSession(
+            id=session_id,
+            project_id=formula.project_id,
+            owner_id=owner_id,
+        )
+        db.add(session)
+        db.commit()
+        db.refresh(session)
+    return session
+
+
+def list_formula_chat_messages(
+    db: Session, formula_id: str, owner_id: int | None = None
+):
+    import json
+    from app.models.chat import ChatMessage
+    from app.schemas.formula import FormulaChatMessageOutput
+
+    session = get_formula_chat_session(db, formula_id, owner_id=owner_id)
+    if session is None:
+        return None
+
+    try:
+        rows = (
+            db.query(ChatMessage)
+            .filter(ChatMessage.session_id == session.id)
+            .order_by(ChatMessage.created_at.asc())
+            .all()
+        )
+        results = []
+        for r in rows:
+            content_text = r.content
+            proposal_data = None
+            linked_artifact = None
+
+            # Check if payload contains serialized metadata
+            if content_text.startswith("__PARAGON_META__:"):
+                try:
+                    split_idx = content_text.find("\n---\n")
+                    if split_idx != -1:
+                        meta_json = content_text[len("__PARAGON_META__:") : split_idx]
+                        content_text = content_text[split_idx + 5 :]
+                        parsed = json.loads(meta_json)
+                        proposal_data = parsed.get("proposal")
+                        linked_artifact = parsed.get("linked_artifact_id")
+                except Exception:
+                    pass
+
+            results.append(
+                FormulaChatMessageOutput(
+                    id=r.id,
+                    session_id=r.session_id,
+                    role=r.role,
+                    content=content_text,
+                    proposal=proposal_data,
+                    linked_artifact_id=linked_artifact,
+                    created_at=r.created_at,
+                )
+            )
+        return results
+    except Exception as exc:
+        raise DatabaseUnavailableError(str(exc)) from exc
+
+
+def add_formula_chat_message(
+    db: Session,
+    formula_id: str,
+    role: str,
+    content: str,
+    proposal: dict | None = None,
+    linked_artifact_id: str | None = None,
+    owner_id: int | None = None,
+):
+    import json
+    from app.models.chat import ChatMessage
+    from app.schemas.formula import FormulaChatMessageOutput
+
+    session = get_formula_chat_session(db, formula_id, owner_id=owner_id)
+    if session is None:
+        return None
+
+    full_content = content
+    if proposal or linked_artifact_id:
+        meta = {
+            "proposal": proposal,
+            "linked_artifact_id": linked_artifact_id,
+        }
+        full_content = f"__PARAGON_META__:{json.dumps(meta)}\n---\n{content}"
+
+    try:
+        msg = ChatMessage(
+            session_id=session.id,
+            role=role,
+            content=full_content,
+        )
+        db.add(msg)
+        db.commit()
+        db.refresh(msg)
+
+        return FormulaChatMessageOutput(
+            id=msg.id,
+            session_id=msg.session_id,
+            role=msg.role,
+            content=content,
+            proposal=proposal,
+            linked_artifact_id=linked_artifact_id,
+            created_at=msg.created_at,
+        )
+    except Exception as exc:
+        db.rollback()
+        raise DatabaseUnavailableError(str(exc)) from exc

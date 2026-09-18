@@ -102,3 +102,22 @@ class FormulaAdjustmentResponse(BaseModel):
     changes: list[FormulaChangeItem]
     updated_phases: FormulaPhases
     total_weight_pct: float
+
+
+class FormulaChatMessageCreate(BaseModel):
+    role: str = Field(pattern="^(user|assistant|system)$")
+    content: str = Field(min_length=1, max_length=10000)
+    proposal: dict | None = None
+    linked_artifact_id: str | None = None
+
+
+class FormulaChatMessageOutput(BaseModel):
+    id: int
+    session_id: str
+    role: str
+    content: str
+    proposal: dict | None = None
+    linked_artifact_id: str | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}

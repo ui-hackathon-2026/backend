@@ -4,15 +4,19 @@ from app.api.deps import OptionalUserDep, SessionDep
 from app.schemas.formula import (
     FormulaAdjustmentRequest,
     FormulaAdjustmentResponse,
+    FormulaChatMessageCreate,
+    FormulaChatMessageOutput,
     FormulaCreate,
     FormulaResponse,
     FormulaUpdate,
     FormulaVersionOutput,
 )
 from app.services.formula_service import (
+    add_formula_chat_message,
     create_formula,
     delete_formula,
     get_formula,
+    list_formula_chat_messages,
     list_formulas,
     list_versions,
     propose_formula_adjustment,
@@ -107,6 +111,43 @@ def versions(
 ) -> list[FormulaVersionOutput]:
     owner_id = user.id if user else None
     result = list_versions(db, formula_id, owner_id=owner_id)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Formula not found"
+        )
+    return result
+
+
+@router.get("/{formula_id}/messages", response_model=list[FormulaChatMessageOutput])
+def get_messages(
+    formula_id: str, db: SessionDep, user: OptionalUserDep
+) -> list[FormulaChatMessageOutput]:
+    owner_id = user.id if user else None
+    result = list_formula_chat_messages(db, formula_id, owner_id=owner_id)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Formula not found"
+        )
+    return result
+
+
+@router.post("/{formula_id}/messages", response_model=FormulaChatMessageOutput, status_code=201)
+def post_message(
+    formula_id: str,
+    body: FormulaChatMessageCreate,
+    db: SessionDep,
+    user: OptionalUserDep,
+) -> FormulaChatMessageOutput:
+    owner_id = user.id if user else None
+    result = add_formula_chat_message(
+        db=db,
+        formula_id=formula_id,
+        role=body.role,
+        content=body.content,
+        proposal=body.proposal,
+        linked_artifact_id=body.linked_artifact_id,
+        owner_id=owner_id,
+    )
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Formula not found"
