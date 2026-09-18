@@ -171,6 +171,26 @@ def test_conformer_invalid_smiles(authed_client):
     assert r.status_code == 422
 
 
+def test_conformer_unresolved_caveat(authed_client, db_session):
+    from app.models.structure import IngredientStructureComponent
+
+    db_session.add(
+        IngredientStructureComponent(
+            ingredient_inci="Royal Jelly Extract",
+            representation_type="unresolved",
+            caveat_note="Belum ada struktur terverifikasi untuk ekstrak ini.",
+            source="test",
+        )
+    )
+    db_session.commit()
+    r = authed_client.post(
+        "/api/v1/molecules/conformer-3d",
+        json={"name": "Royal Jelly Extract"},
+    )
+    assert r.status_code == 422
+    assert "terverifikasi" in r.json()["detail"]
+
+
 def test_suppliers_list_and_filter(authed_client, db_session):
     from app.models.catalog import Supplier
 

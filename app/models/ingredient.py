@@ -25,3 +25,6 @@ class Ingredient(Base):
     halal_status: Mapped[str] = mapped_column(String(32), default="HALAL")
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     origin: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    structure_representation_type: Mapped[str] = mapped_column(
+        String(32), default="unresolved"
+    )

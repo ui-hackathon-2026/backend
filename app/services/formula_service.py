@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import DatabaseUnavailableError, FormulaWeightError
 from app.models.formula import Formula, FormulaIngredient, FormulaVersion
+from app.models.ingredient import Ingredient
 from app.schemas.formula import (
     FormulaCreate,
     FormulaResponse,
@@ -76,7 +77,9 @@ def create_formula(db: Session, body: FormulaCreate, owner_id: int | None = None
             owner_id=owner_id,
         )
         db.add(formula)
+        catalog = {row.inci: row for row in db.query(Ingredient).all()}
         for phase, item in items:
+            known = catalog.get(item.inci)
             db.add(
                 FormulaIngredient(
                     formula_id=formula.id,
@@ -86,6 +89,9 @@ def create_formula(db: Session, body: FormulaCreate, owner_id: int | None = None
                     smiles=item.smiles,
                     weight_pct=item.weight_pct,
                     is_locked=item.is_locked,
+                    cost_idr_per_kg=known.cost_per_kg_idr if known else None,
+                    tkdn_pct=known.tkdn_pct if known else None,
+                    cost_source="catalog_estimate" if known else "unknown",
                 )
             )
         db.commit()
@@ -185,7 +191,9 @@ def update_formula(
             formula.owner_id = owner_id
         for old in list(formula.ingredients):
             db.delete(old)
+        catalog = {row.inci: row for row in db.query(Ingredient).all()}
         for phase, item in items:
+            known = catalog.get(item.inci)
             db.add(
                 FormulaIngredient(
                     formula_id=formula_id,
@@ -195,6 +203,9 @@ def update_formula(
                     smiles=item.smiles,
                     weight_pct=item.weight_pct,
                     is_locked=item.is_locked,
+                    cost_idr_per_kg=known.cost_per_kg_idr if known else None,
+                    tkdn_pct=known.tkdn_pct if known else None,
+                    cost_source="catalog_estimate" if known else "unknown",
                 )
             )
         db.commit()

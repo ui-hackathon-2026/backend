@@ -1,3 +1,9 @@
+from sqlalchemy import text
+
+from app.models.formula import FormulaIngredient
+from app.models.ingredient import Ingredient
+
+
 def phases(aqua_pct=83.0):
     return {
         "phase_a": [
@@ -52,6 +58,72 @@ def test_create_ok(authed_client):
     assert len(body["ingredients"]) == 6
     locked = [i for i in body["ingredients"] if i["is_locked"]]
     assert len(locked) == 1 and locked[0]["inci"] == "Glyceryl Stearate"
+
+
+def test_cost_snapshot_and_view(authed_client, db_session):
+    db_session.add(
+        Ingredient(
+            inci="Test Oil", name="Test Oil", smiles="CCCC",
+            default_phase="A", default_role="emollient",
+            cost_per_kg_idr=100000, tkdn_pct=50.0,
+        )
+    )
+    db_session.commit()
+    fid = authed_client.post(
+        "/api/v1/formulas",
+        json={
+            "name": "Costed",
+            "phases": {
+                "phase_a": [{"inci": "Test Oil", "weight_pct": 20.0}],
+                "phase_b": [{"inci": "Aqua", "weight_pct": 80.0}],
+            },
+        },
+    ).json()["formula_id"]
+    rows = db_session.query(FormulaIngredient).filter_by(formula_id=fid).all()
+    by_inci = {r.inci: r for r in rows}
+    assert by_inci["Test Oil"].cost_source == "catalog_estimate"
+    assert by_inci["Test Oil"].cost_idr_per_kg == 100000
+    assert by_inci["Test Oil"].tkdn_pct == 50.0
+    db_session.execute(
+        text(
+            "CREATE VIEW IF NOT EXISTS formulation_cost_view AS "
+            "SELECT f.id AS formula_id, f.name AS formula_name, "
+            "ROUND(CAST(SUM(fi.weight_pct / 100.0 * COALESCE(fi.cost_idr_per_kg, 0.0)) AS numeric), 0) "
+            "AS estimated_cogs_idr_per_kg, "
+            "ROUND(CAST(SUM(fi.weight_pct / 100.0 * COALESCE(fi.tkdn_pct, 0.0)) AS numeric), 1) "
+            "AS average_tkdn_pct, COUNT(fi.id) AS ingredient_count "
+            "FROM formulas f LEFT JOIN formula_ingredients fi ON fi.formula_id = f.id "
+            "GROUP BY f.id, f.name"
+        )
+    )
+    view = db_session.execute(
+        text(
+            "SELECT estimated_cogs_idr_per_kg, average_tkdn_pct "
+            "FROM formulation_cost_view WHERE formula_id = :fid"
+        ),
+        {"fid": fid},
+    ).first()
+    assert float(view[0]) == 20000.0
+    assert float(view[1]) == 10.0
+
+
+def test_procurement_fields_absent_from_ml_features():
+    from app.ml.predictor import LightGBMPredictor
+
+    predictor = LightGBMPredictor()
+    sample = predictor.feature_dict(
+        {
+            "oil_pct": 8.0, "emulsifier_pct": 4.5, "thickener_pct": 0.0,
+            "solvent_pct": 83.0, "humectant_pct": 3.5, "active_pct": 1.0,
+            "preservative_pct": 0.0, "ingredient_count": 6,
+            "temperature_c": 40.0, "duration_days": 90,
+            "delta_hlb": 3.5, "sor": 0.562, "unknown_incis": [],
+        }
+    )
+    joined = " ".join(sample.keys()).lower()
+    assert "cost" not in joined
+    assert "tkdn" not in joined
+    assert "price" not in joined
 
 
 def test_create_bad_sum_returns_400(authed_client):

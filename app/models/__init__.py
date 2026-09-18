@@ -14,6 +14,7 @@ from app.models.formula import Formula, FormulaIngredient, FormulaVersion
 from app.models.ingredient import Ingredient
 from app.models.project import Brief, Project
 from app.models.simulation_run import SimulationRun
+from app.models.structure import IngredientStructureComponent
 from app.models.user import RefreshToken, User
 
 __all__ = [
@@ -28,6 +29,7 @@ __all__ = [
     "FormulaIngredient",
     "FormulaVersion",
     "Ingredient",
+    "IngredientStructureComponent",
     "KnowledgeChunk",
     "OptimizationJob",
     "ProhibitedSubstance",

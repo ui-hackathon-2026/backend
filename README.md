@@ -100,7 +100,9 @@ unknown to the `ingredients` catalog flip the OOD flag.
 (`phase_a` oil, `phase_b` water, `phase_c` emulsifier, `phase_d`
 heat-sensitive actives), validates the 100% mass balance, and returns
 `VALID_BALANCED`. Full CRUD plus append-only version snapshots on every
-update (`GET /api/v1/formulas/{id}/versions`).
+update (`GET /api/v1/formulas/{id}/versions`). Ingredient costs freeze
+at save time (`catalog_estimate`/`unknown`); `formulation_cost_view`
+aggregates COGS/TKDN with frontend-identical weighting.
 
 ## Compliance
 
