@@ -411,8 +411,16 @@ def add_message(
             query = query.filter(Formula.owner_id == owner_id)
         else:
             query = query.filter(Formula.owner_id.is_(None))
-        if query.first() is None:
-            return None
+        formula = query.first()
+        if formula is None:
+            formula = Formula(
+                id=formula_id,
+                name=formula_id.replace("-", " ").title(),
+                owner_id=owner_id,
+            )
+            db.add(formula)
+            db.commit()
+            db.refresh(formula)
         session_id = ensure_formula_session(db, formula_id)
         from app.models.chat import ChatMessage as ChatRow
 
